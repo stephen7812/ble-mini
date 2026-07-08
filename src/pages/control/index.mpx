@@ -1,0 +1,134 @@
+<template>
+  <view class="page">
+    <view class="card">
+      <view class="flex-between">
+        <text class="text-lg font-bold">{{deviceName}}</text>
+        <text class="tag {{connected ? 'tag-success' : 'tag-error'}}">{{connected ? '已连接' : '未连接'}}</text>
+      </view>
+      <text class="text-sm text-secondary mt-8">{{valveType}}</text>
+    </view>
+
+    <view class="card" wx:if="{{valveTypeId === 'new'}}">
+      <text class="text-sm font-bold mb-8">实时数据（先导调节阀）</text>
+      <view class="data-grid">
+        <view class="data-item" wx:for="{{newFields}}" wx:key="key">
+          <text class="data-label">{{item.label}}</text>
+          <text class="data-value {{item.highlight || ''}}">{{item.value}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{valveTypeId === 'old'}}">
+      <text class="text-sm font-bold mb-8">实时数据（智能调节阀）</text>
+      <view class="data-grid">
+        <view class="data-item" wx:for="{{oldFields}}" wx:key="key">
+          <text class="data-label">{{item.label}}</text>
+          <text class="data-value {{item.highlight || ''}}">{{item.value}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{connected}}">
+      <text class="text-sm font-bold mb-8">操作</text>
+      <view class="action-row">
+        <button class="btn-outline" bindtap="queryData">查询参数</button>
+        <button class="btn-primary" bindtap="goDeviceInfo">高级设置</button>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+import { connect, disconnect, write, onNotify } from '../../services/ble/connector'
+import { getProtocol } from '../../services/protocol/factory'
+import { voltageMvToV } from '../../utils/convert'
+
+createPage({
+  data: {
+    deviceName: '', valveTypeId: 'old', valveType: '智能调节阀',
+    connected: false, protocolData: {}, newFields: [], oldFields: [],
+  },
+  onLoad() {
+    const device = useDeviceStore().currentDevice
+    if (!device) { wx.navigateBack(); return }
+    this.setData({
+      deviceName: device.localName || device.deviceId,
+      valveTypeId: device.valveTypeId || 'old',
+      valveType: device.valveType || '智能调节阀',
+    })
+    this.doConnect()
+  },
+  onUnload() { if (this.data.connected) disconnect() },
+  doConnect() {
+    const device = useDeviceStore().currentDevice
+    if (!device) return
+    const that = this
+    wx.showLoading({ title: '连接中...' })
+    connect(device.deviceId).then(() => {
+      that.setData({ connected: true })
+      wx.hideLoading()
+      wx.showToast({ title: '连接成功', icon: 'success' })
+      const protocol = getProtocol(that.data.valveTypeId)
+      onNotify((frame) => {
+        const parsed = protocol.parseResponse(frame)
+        if (parsed) {
+          const merged = { ...that.data.protocolData, ...parsed }
+          that.setData({ protocolData: merged })
+          that.refreshFields(merged)
+        }
+      })
+    }).catch((err) => { wx.hideLoading(); wx.showToast({ title: err.message, icon: 'none' }) })
+  },
+  refreshFields(data) {
+    if (this.data.valveTypeId === 'new') {
+      this.setData({
+        newFields: [
+          { key: 'inletPressure', label: '进水压力', value: (data.inletPressure || 0) + ' KPa' },
+          { key: 'returnPressure', label: '回水压力', value: (data.returnPressure || 0) + ' KPa' },
+          { key: 'setPressure', label: '设定压力', value: (data.setPressure || 0) + ' KPa', highlight: 'text-primary' },
+          { key: 'valvePosition', label: '阀门圈数', value: data.valvePosition ?? '-' },
+          { key: 'battery', label: '电池电压', value: voltageMvToV(data.batteryVoltage || 0) + 'V' },
+          { key: 'signal', label: '信号', value: (data.signalStrength ?? '-') + 'dBm' },
+        ],
+      })
+    } else {
+      this.setData({
+        oldFields: [
+          { key: 'workMode', label: '工作模式', value: data.workMode || '-' },
+          { key: 'valveOpening', label: '阀门开度', value: (data.valveOpening ?? '-') + '%' },
+          { key: 'targetOpening', label: '设定开度', value: (data.targetOpening ?? '-') + '%' },
+          { key: 'inletTemp', label: '进水温度', value: (data.inletTemp ?? '-') + '℃' },
+          { key: 'returnTemp', label: '回水温度', value: (data.returnTemp ?? '-') + '℃' },
+        ],
+      })
+    }
+  },
+  queryData() {
+    if (!this.data.connected) { wx.showToast({ title: '请先连接设备', icon: 'none' }); return }
+    const cmd = getProtocol(this.data.valveTypeId).commands.queryPage1()
+    wx.showLoading({ title: '发送中...' })
+    write(cmd).then(() => wx.hideLoading()).catch(() => { wx.hideLoading(); wx.showToast({ title: '发送失败', icon: 'none' }) })
+  },
+  goDeviceInfo() {
+    const store = useDeviceStore()
+    store.setCurrentDevice({ ...store.currentDevice, connected: this.data.connected })
+    wx.navigateTo({ url: '/pages/device-info/index' })
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; }
+.data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
+.data-item { background: var(--color-bg); border-radius: var(--radius); padding: 16rpx; }
+.data-label { font-size: 22rpx; color: var(--color-text-secondary); }
+.data-value { font-size: 32rpx; font-weight: 600; margin-top: 4rpx; display: block; }
+.action-row { display: flex; gap: 16rpx; }
+.action-row > * { flex: 1; }
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "设备控制" }
+</script>

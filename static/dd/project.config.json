@@ -1,0 +1,15 @@
+{
+  "setting": {
+    "newFeature": true,
+    "urlCheck": true,
+    "es6": false,
+    "postcss": false,
+    "minified": false,
+    "checkSiteMap": false,
+    "autoAudits": false
+  },
+  "appid": "wx5dc9688a176d3d16",
+  "projectname": "zf-mpx",
+  "description": "zf mpx mini",
+  "condition": {}
+}

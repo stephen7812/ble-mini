@@ -1,0 +1,65 @@
+<template>
+  <view class="page">
+    <view class="header">
+      <text class="header-title">我的设备</text>
+      <button class="btn-primary" bindtap="goScan">搜索设备</button>
+    </view>
+
+    <view wx:if="{{pairedDevices.length === 0}}" class="empty">
+      <text class="empty-icon">+</text>
+      <text class="empty-text">点击上方按钮搜索附近阀门</text>
+    </view>
+
+    <view wx:for="{{pairedDevices}}" wx:key="deviceId" class="card device-card" bindtap="goControl" data-device="{{item}}">
+      <view class="flex-between">
+        <view>
+          <text class="device-name">{{item.localName || item.deviceId}}</text>
+          <text class="tag tag-success ml-8">{{item.valveType || '智能调节阀'}}</text>
+        </view>
+        <text class="text-sm text-secondary">{{item.lastSeenText}}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+import { formatTimeDiff } from '../../utils/convert'
+
+createPage({
+  data: { pairedDevices: [] },
+  onShow() {
+    this.formatDevices()
+  },
+  formatDevices() {
+    const store = useDeviceStore()
+    this.setData({
+      pairedDevices: (store.pairedDevices || []).map(d => ({ ...d, lastSeenText: formatTimeDiff(d.lastSeen) })),
+    })
+  },
+  goScan() {
+    wx.navigateTo({ url: '/pages/scan/index' })
+  },
+  goControl(e) {
+    const device = e.currentTarget.dataset.device
+    useDeviceStore().setCurrentDevice(device)
+    wx.navigateTo({ url: '/pages/control/index' })
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 16rpx; }
+.header-title { font-size: 36rpx; font-weight: 600; }
+.empty { display: flex; flex-direction: column; align-items: center; margin-top: 200rpx; }
+.empty-icon { font-size: 80rpx; margin-bottom: 16rpx; }
+.empty-text { font-size: 28rpx; color: var(--color-text-secondary); }
+.device-card { margin: 16rpx; }
+.device-name { font-size: 30rpx; font-weight: 500; }
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "我的设备" }
+</script>

@@ -1,0 +1,86 @@
+<template>
+  <view class="page">
+    <view class="scan-status flex-center {{isScanning ? 'scanning' : ''}}">
+      <view class="scan-indicator"></view>
+      <text>{{isScanning ? '正在搜索...' : '点击开始搜索'}}</text>
+    </view>
+
+    <button class="btn-primary mt-16" bindtap="toggleScan">
+      {{isScanning ? '停止搜索' : '开始搜索'}}
+    </button>
+
+    <view wx:if="{{devices.length === 0 && !isScanning}}" class="empty">
+      <text class="text-secondary">未发现设备</text>
+    </view>
+
+    <view wx:for="{{devices}}" wx:key="deviceId" class="card device-card mt-8" bindtap="selectDevice" data-device="{{item}}">
+      <view class="flex-between">
+        <view>
+          <text class="device-name">{{item.localName || item.deviceId}}</text>
+          <text class="tag tag-success ml-8">{{item.valveType || '检测中...'}}</text>
+        </view>
+        <text class="text-sm text-secondary">RSSI: {{item.RSSI}}dBm</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+import { startScan, stopScan } from '../../services/ble/scanner'
+import { detectValveType } from '../../services/protocol/factory'
+
+createPage({
+  data: { isScanning: false, devices: [] },
+  toggleScan() {
+    this.data.isScanning ? this.stopScanInternal() : this.startScanInternal()
+  },
+  startScanInternal() {
+    const that = this
+    that.setData({ devices: [], isScanning: true })
+    startScan({
+      onFound(device) {
+        const valveType = detectValveType(device)
+        const devices = that.data.devices
+        if (!devices.find(d => d.deviceId === device.deviceId)) {
+          devices.push({ ...device, valveType: valveType.type })
+          that.setData({ devices })
+        }
+      },
+      onError(err) {
+        wx.showToast({ title: err.message, icon: 'none' })
+        that.setData({ isScanning: false })
+      },
+      duration: 15000,
+    })
+  },
+  stopScanInternal() {
+    stopScan(); this.setData({ isScanning: false })
+  },
+  selectDevice(e) {
+    const device = e.currentTarget.dataset.device
+    this.stopScanInternal()
+    const store = useDeviceStore()
+    store.addDevice(device)
+    store.setCurrentDevice(device)
+    wx.navigateTo({ url: '/pages/control/index' })
+  },
+  onUnload() { this.stopScanInternal() },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; }
+.scan-status { flex-direction: column; padding: 40rpx; border-radius: var(--radius); background: var(--color-card); margin: 16rpx; }
+.scan-indicator { width: 80rpx; height: 80rpx; border-radius: 50%; background: var(--color-primary); margin-bottom: 16rpx; opacity: 0.3; }
+.scanning .scan-indicator { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
+.device-card { margin: 16rpx; }
+.device-name { font-size: 30rpx; font-weight: 500; }
+.empty { text-align: center; margin-top: 60rpx; }
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "搜索设备" }
+</script>

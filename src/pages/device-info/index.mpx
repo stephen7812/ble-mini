@@ -1,0 +1,105 @@
+<template>
+  <view class="page">
+    <view wx:if="{{valveTypeId === 'new'}}" class="card">
+      <text class="text-sm font-bold mb-8">压力设置</text>
+      <view class="form-item">
+        <text class="form-label">目标压力 (MPa)</text>
+        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0.0 ~ 2.5" />
+      </view>
+      <button class="btn-primary" bindtap="setPressure">设置压力</button>
+
+      <view class="form-item mt-16">
+        <text class="form-label">进水压力补偿 (KPa)</text>
+        <input class="form-input" type="digit" model:value="{{inletComp}}" placeholder="-120 ~ 120" />
+      </view>
+      <button class="btn-outline mt-8" bindtap="setPressureComp">设置补偿</button>
+    </view>
+
+    <view wx:if="{{valveTypeId === 'old'}}" class="card">
+      <text class="text-sm font-bold mb-8">开度设置</text>
+      <view class="form-item">
+        <text class="form-label">阀门开度 (%)</text>
+        <slider min="0" max="100" model:value="{{targetOpening}}" show-value />
+      </view>
+      <button class="btn-primary" bindtap="setOpening">设置开度</button>
+
+      <view class="form-item mt-16">
+        <text class="form-label">工作模式</text>
+        <picker model:value="{{workModeIndex}}" range="{{workModes}}" bindchange="onWorkModeChange">
+          <view class="form-input">{{workModes[workModeIndex]}}</view>
+        </picker>
+      </view>
+      <button class="btn-outline mt-8" bindtap="setMode">设置模式</button>
+    </view>
+
+    <view class="card mt-16">
+      <text class="text-sm font-bold mb-8">设备维护</text>
+      <view class="action-row">
+        <button class="btn-outline" bindtap="deviceReset">复位</button>
+        <button class="btn-outline" bindtap="deviceRestart">重启</button>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+import { write } from '../../services/ble/connector'
+import { getProtocol } from '../../services/protocol/factory'
+import { pressureMPaTo10KPa } from '../../utils/convert'
+
+createPage({
+  data: {
+    valveTypeId: 'old', targetPressure: '0.2', inletComp: '0',
+    targetOpening: 50, workModeIndex: 1,
+    workModes: ['通断阀', '回水调节', '室内调节', '流量平衡', '停止'],
+  },
+  onLoad() {
+    const device = useDeviceStore().currentDevice
+    if (!device) { wx.navigateBack(); return }
+    this.setData({ valveTypeId: device.valveTypeId || 'old' })
+    this.protocol = getProtocol(this.data.valveTypeId)
+    this.cmds = this.protocol.commands
+  },
+  setPressure() {
+    const mpa = parseFloat(this.data.targetPressure)
+    if (isNaN(mpa) || mpa < 0 || mpa > 2.5) { wx.showToast({ title: '无效压力值', icon: 'none' }); return }
+    this.sendFrame(this.cmds.setTargetPressure(pressureMPaTo10KPa(mpa)), '设置成功')
+  },
+  setPressureComp() {
+    if (!this.cmds.setPressureCompensation) return
+    const v = parseInt(this.data.inletComp) || 0
+    this.sendFrame(this.cmds.setPressureCompensation(v, v), '设置成功')
+  },
+  setOpening() { this.sendFrame(this.cmds.setOpening(this.data.targetOpening), '设置成功') },
+  onWorkModeChange(e) { this.setData({ workModeIndex: e.detail.value }) },
+  setMode() {
+    this.sendFrame(this.cmds.setWorkMode([0x81, 0x82, 0x83, 0x84, 0x89][this.data.workModeIndex]), '模式设置成功')
+  },
+  deviceReset() {
+    wx.showModal({ title: '确认', content: '确定复位设备？', success: (res) => { if (res.confirm) this.sendFrame(this.cmds.deviceReset(), '复位成功') } })
+  },
+  deviceRestart() {
+    wx.showModal({ title: '确认', content: '确定重启设备？', success: (res) => { if (res.confirm) this.sendFrame(this.cmds.deviceRestart(), '重启成功') } })
+  },
+  sendFrame(frame, successMsg) {
+    wx.showLoading({ title: '发送中...' })
+    write(frame).then(() => { wx.hideLoading(); wx.showToast({ title: successMsg, icon: 'success' }) })
+      .catch((err) => { wx.hideLoading(); wx.showToast({ title: err.message || '发送失败', icon: 'none' }) })
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; }
+.form-item { margin-bottom: 16rpx; }
+.form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
+.form-input { width: 100%; height: 72rpx; border: 2rpx solid var(--color-border); border-radius: var(--radius); padding: 0 16rpx; font-size: 26rpx; box-sizing: border-box; }
+.action-row { display: flex; gap: 16rpx; }
+.action-row > * { flex: 1; }
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "高级设置" }
+</script>

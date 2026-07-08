@@ -1,0 +1,84 @@
+<script>
+import { createApp } from '@mpxjs/core'
+import { createPinia } from '@mpxjs/pinia'
+import { useDeviceStore } from './stores/device'
+
+createApp({
+  onLaunch() {
+    createPinia()
+    useDeviceStore().loadHistory()
+  },
+})
+</script>
+
+<style>
+page {
+  --color-primary: #1677ff;
+  --color-success: #00b578;
+  --color-warning: #ff8f1f;
+  --color-danger: #ff3141;
+  --color-bg: #f5f5f5;
+  --color-card: #ffffff;
+  --color-text: #333333;
+  --color-text-secondary: #999999;
+  --color-border: #eeeeee;
+  --radius: 12rpx;
+  background: var(--color-bg);
+  font-size: 28rpx;
+  color: var(--color-text);
+}
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  padding: 24rpx;
+  margin: 16rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+}
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.text-primary { color: var(--color-primary); }
+.text-success { color: var(--color-success); }
+.text-danger { color: var(--color-danger); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-sm { font-size: 24rpx; }
+.text-lg { font-size: 32rpx; }
+.font-bold { font-weight: 600; }
+.mt-8 { margin-top: 16rpx; }
+.mt-16 { margin-top: 32rpx; }
+.mb-8 { margin-bottom: 16rpx; }
+.ml-8 { margin-left: 16rpx; }
+.btn-primary {
+  background: var(--color-primary); color: #fff;
+  border-radius: var(--radius); padding: 20rpx 48rpx;
+  text-align: center; font-size: 28rpx;
+}
+.btn-primary:active { opacity: 0.8; }
+.btn-outline {
+  border: 2rpx solid var(--color-primary); color: var(--color-primary);
+  border-radius: var(--radius); padding: 18rpx 48rpx;
+  text-align: center; font-size: 28rpx; background: transparent;
+}
+.tag {
+  display: inline-block; padding: 4rpx 16rpx;
+  border-radius: 8rpx; font-size: 22rpx;
+}
+.tag-success { background: #e8faf0; color: #00b578; }
+.tag-warning { background: #fff3e8; color: #ff8f1f; }
+.tag-error { background: #ffeeed; color: #ff3141; }
+</style>
+
+<script type="application/json">
+{
+  "pages": [
+    "./pages/index/index",
+    "./pages/scan/index",
+    "./pages/control/index",
+    "./pages/device-info/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "正丰智能阀门",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black"
+  }
+}
+</script>
