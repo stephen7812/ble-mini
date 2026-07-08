@@ -44,7 +44,7 @@ createPage({
         const valveType = detectValveType(device)
         const devices = that.data.devices
         if (!devices.find(d => d.deviceId === device.deviceId)) {
-          devices.push({ ...device, valveType: valveType.type })
+          devices.push({ ...device, valveType: valveType.type, valveTypeId: valveType.typeId })
           that.setData({ devices })
         }
       },

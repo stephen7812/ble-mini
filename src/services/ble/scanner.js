@@ -26,9 +26,7 @@ export function startScan({ onFound, onError, duration = 10000 }) {
 
 function startDiscovery(onFound, onError) {
   wx.onBluetoothDeviceFound((res) => {
-    res.devices.forEach((device) => {
-      if (isBlackAntDevice(device)) onFound(device)
-    })
+    res.devices.forEach((device) => onFound(device))
   })
   wx.startBluetoothDevicesDiscovery({
     allowDuplicatesKey: false, interval: 0,
@@ -48,14 +46,4 @@ export function stopScan() {
 export function closeBluetooth() {
   stopScan()
   wx.closeBluetoothAdapter({})
-}
-
-function isBlackAntDevice(device) {
-  const name = device.localName || device.name || ''
-  if (['V5-', 'BA-', 'BLACKANT', 'P-', 'P_'].some(p => name.startsWith(p))) return true
-  if (device.advertisData) {
-    const buf = new Uint8Array(device.advertisData)
-    if (buf.length >= 2 && ((buf[1] << 8) | buf[0]) === 0x06B0) return true
-  }
-  return false
 }
