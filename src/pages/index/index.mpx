@@ -2,7 +2,10 @@
   <view class="page">
     <view class="header">
       <text class="header-title">我的设备</text>
-      <button class="btn-primary" bindtap="goScan">搜索设备</button>
+      <view class="flex-row">
+        <button wx:if="{{pairedDevices.length > 0}}" class="btn-text" bindtap="clearHistory">清除</button>
+        <button class="btn-primary" bindtap="goScan">搜索设备</button>
+      </view>
     </view>
 
     <view wx:if="{{pairedDevices.length === 0}}" class="empty">
@@ -47,6 +50,12 @@ createPage({
     useDeviceStore().setCurrentDevice(device)
     wx.navigateTo({ url: '/pages/control/index' })
   },
+  clearHistory() {
+    wx.showModal({
+      title: '确认清除', content: '确定清除所有连接记录？',
+      success: (res) => { if (res.confirm) { useDeviceStore().clearHistory(); this.formatDevices() } },
+    })
+  },
 })
 </script>
 
@@ -59,6 +68,8 @@ createPage({
 .empty-text { font-size: 28rpx; color: var(--color-text-secondary); }
 .device-card { margin: 16rpx; }
 .device-name { font-size: 30rpx; font-weight: 500; }
+.flex-row { display: flex; align-items: center; gap: 16rpx; }
+.btn-text { background: transparent; border: none; color: var(--color-danger); font-size: 28rpx; padding: 0; }
 </style>
 
 <script type="application/json">

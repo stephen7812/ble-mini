@@ -35,5 +35,9 @@ export const useDeviceStore = defineStore('device', {
     setScanning(v) {
       this.isScanning = v
     },
+    clearHistory() {
+      this.pairedDevices = []
+      wx.setStorageSync('pairedDevices', [])
+    },
   },
 })
