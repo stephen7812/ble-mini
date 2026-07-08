@@ -4,7 +4,10 @@
       <text class="text-sm font-bold mb-8">手动连接设备</text>
       <view class="form-item">
         <text class="form-label">设备编号（MAC 地址）</text>
-        <input class="form-input" model:value="{{manualDeviceId}}" placeholder="例如 3C:A8:2A:29:6A:17" />
+        <view class="input-row">
+          <input class="form-input flex-1" model:value="{{manualDeviceId}}" placeholder="例如 3C:A8:2A:29:6A:17" />
+          <button class="btn-scan" bindtap="scanCode">扫码</button>
+        </view>
       </view>
       <view class="form-item">
         <text class="form-label">阀门类型</text>
@@ -60,6 +63,20 @@ createPage({
   onValveTypeChange(e) {
     this.setData({ valveTypeIndex: e.detail.value })
   },
+  scanCode() {
+    const that = this
+    wx.scanCode({
+      success(res) {
+        const code = res.result || ''
+        const last6 = code.slice(-6)
+        that.setData({ manualDeviceId: last6 })
+        wx.showToast({ title: '已填入设备编号', icon: 'success' })
+      },
+      fail(err) {
+        if (err.errCode !== -1) wx.showToast({ title: '扫码失败', icon: 'none' })
+      },
+    })
+  },
   manualConnect() {
     const id = this.data.manualDeviceId.trim()
     if (!id) { wx.showToast({ title: '请输入设备编号', icon: 'none' }); return }
@@ -101,6 +118,11 @@ createPage({
 .form-item { margin-bottom: 24rpx; }
 .form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
 .form-input { width: 100%; height: 72rpx; border: 2rpx solid var(--color-border); border-radius: var(--radius); padding: 0 16rpx; font-size: 26rpx; box-sizing: border-box; }
+.input-row { display: flex; gap: 16rpx; }
+.input-row .form-input { width: auto; }
+.flex-1 { flex: 1; }
+.btn-scan { flex-shrink: 0; background: var(--color-primary); color: #fff; border-radius: var(--radius); padding: 0 24rpx; font-size: 26rpx; height: 72rpx; line-height: 72rpx; }
+.btn-scan:active { opacity: 0.8; }
 </style>
 
 <script type="application/json">
