@@ -1,11 +1,11 @@
 <template>
   <view class="page">
     <view class="card">
-      <text class="text-sm font-bold mb-8">自动连接设备</text>
+      <text class="text-sm font-bold mb-8">连接设备</text>
       <view class="form-item">
         <text class="form-label">设备编号（扫机身二维码）</text>
         <view class="input-row">
-          <input class="form-input flex-1" model:value="{{deviceCode}}" placeholder="扫码或输入编号后6位" maxlength="20" />
+          <input class="form-input flex-1" model:value="{{deviceCode}}" placeholder="扫码或输入设备编号" />
           <button class="btn-scan" bindtap="scanCode">扫码</button>
         </view>
       </view>
@@ -15,11 +15,7 @@
           <view class="form-input">{{valveTypes[valveTypeIndex]}}</view>
         </picker>
       </view>
-      <button class="btn-primary" bindtap="startAutoConnect" wx:if="{{!scanning}}">搜索并连接</button>
-      <view wx:if="{{scanning}}" class="scanning-status">
-        <text class="scanning-text">正在扫描匹配设备 {{deviceIdFilter}}...</text>
-        <button class="btn-text mt-8" bindtap="stopAutoConnect">取消</button>
-      </view>
+      <button class="btn-primary" bindtap="goControl">进入控制</button>
     </view>
 
     <view class="header mt-16">
@@ -32,7 +28,7 @@
       <text class="empty-text">暂无连接记录</text>
     </view>
 
-    <view wx:for="{{pairedDevices}}" wx:key="deviceId" class="card device-card" bindtap="goControl" data-device="{{item}}">
+    <view wx:for="{{pairedDevices}}" wx:key="deviceId" class="card device-card" bindtap="goControlWithDevice" data-device="{{item}}">
       <view class="flex-between">
         <view>
           <text class="device-name">{{item.localName || item.deviceId}}</text>
@@ -49,21 +45,14 @@
 import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
 import { formatTimeDiff } from '../../utils/convert'
-import { startScan, stopScan } from '../../services/ble/scanner'
 
 const valveTypes = ['先导调节阀（压力型）', '智能调节阀（开度型）']
 const valveTypeIds = ['new', 'old']
 
 createPage({
-  data: {
-    pairedDevices: [], deviceCode: '', deviceIdFilter: '',
-    valveTypeIndex: 0, valveTypes, scanning: false,
-  },
+  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 0, valveTypes },
   onShow() {
     this.formatDevices()
-  },
-  onUnload() {
-    if (this.data.scanning) stopScan()
   },
   formatDevices() {
     const store = useDeviceStore()
@@ -79,49 +68,24 @@ createPage({
     wx.scanCode({
       success(res) {
         const code = (res.result || '').trim()
-        const last6 = code.slice(-6)
-        that.setData({ deviceCode: code, deviceIdFilter: last6 })
+        that.setData({ deviceCode: code })
         wx.showToast({ title: '已获取设备编号', icon: 'success' })
       },
-      fail(err) {
-        if (err.errCode !== -1) wx.showToast({ title: '扫码失败', icon: 'none' })
-      },
+      fail(err) { if (err.errCode !== -1) wx.showToast({ title: '扫码失败', icon: 'none' }) },
     })
   },
-  startAutoConnect() {
-    const filter = this.data.deviceCode.trim().slice(-6)
-    if (!filter) { wx.showToast({ title: '请先扫码或输入编号', icon: 'none' }); return }
-    this.setData({ scanning: true, deviceIdFilter: filter })
-    const that = this
-    const store = useDeviceStore()
-    startScan({
-      onFound(device) {
-        const name = (device.localName || device.name || '').toLowerCase()
-        const addr = (device.deviceId || '').replace(/:/g, '').toLowerCase()
-        if (addr.includes(filter.toLowerCase()) || name.includes(filter.toLowerCase())) {
-          stopScan()
-          that.setData({ scanning: false })
-          const deviceWithType = {
-            ...device,
-            valveType: valveTypes[that.data.valveTypeIndex],
-            valveTypeId: valveTypeIds[that.data.valveTypeIndex],
-          }
-          store.setCurrentDevice(deviceWithType)
-          wx.showToast({ title: '已匹配设备，正在连接...', icon: 'success' })
-          wx.navigateTo({ url: '/pages/control/index' })
-        }
-      },
-      onError(err) {
-        that.setData({ scanning: false })
-        wx.showToast({ title: err.message, icon: 'none' })
-      },
-    })
+  goControl() {
+    const code = this.data.deviceCode.trim()
+    if (!code) { wx.showToast({ title: '请扫码或输入设备编号', icon: 'none' }); return }
+    const idx = this.data.valveTypeIndex
+    const device = {
+      deviceId: code, localName: code,
+      valveType: valveTypes[idx], valveTypeId: valveTypeIds[idx],
+    }
+    useDeviceStore().setCurrentDevice(device)
+    wx.navigateTo({ url: '/pages/control/index' })
   },
-  stopAutoConnect() {
-    stopScan()
-    this.setData({ scanning: false })
-  },
-  goControl(e) {
+  goControlWithDevice(e) {
     const device = e.currentTarget.dataset.device
     useDeviceStore().setCurrentDevice(device)
     wx.navigateTo({ url: '/pages/control/index' })
@@ -144,7 +108,6 @@ createPage({
 .empty-text { font-size: 28rpx; color: var(--color-text-secondary); }
 .device-card { margin: 16rpx; }
 .device-name { font-size: 30rpx; font-weight: 500; }
-.flex-row { display: flex; align-items: center; gap: 16rpx; }
 .btn-text { background: transparent; border: none; color: var(--color-danger); font-size: 28rpx; padding: 0; }
 .form-item { margin-bottom: 24rpx; }
 .form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
@@ -154,10 +117,8 @@ createPage({
 .flex-1 { flex: 1; }
 .btn-scan { flex-shrink: 0; background: var(--color-primary); color: #fff; border-radius: var(--radius); padding: 0 24rpx; font-size: 26rpx; height: 72rpx; line-height: 72rpx; }
 .btn-scan:active { opacity: 0.8; }
-.scanning-status { text-align: center; padding: 24rpx; }
-.scanning-text { font-size: 26rpx; color: var(--color-text-secondary); }
 </style>
 
 <script type="application/json">
-{ "navigationBarTitleText": "我的设备" }
+{ "navigationBarTitleText": "智能阀门" }
 </script>

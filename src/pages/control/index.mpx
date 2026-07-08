@@ -28,22 +28,50 @@
       </view>
     </view>
 
-    <view class="card" wx:if="{{connected && hasDeviceInfo}}">
-      <text class="text-sm font-bold mb-8">设备识别信息</text>
-      <view wx:for="{{deviceInfoArr}}" wx:key="key" class="info-row">
-        <text class="info-label">{{item.key}}</text>
-        <text class="info-value">{{item.value}}</text>
-      </view>
-    </view>
-
-    <view class="card" wx:if="{{connected}}">
+    <view class="card">
       <text class="text-sm font-bold mb-8">操作</text>
-      <view class="action-row">
-        <button class="btn-outline" bindtap="queryData">查询参数</button>
-        <button class="btn-primary" bindtap="goDeviceInfo">高级设置</button>
+      <view class="action-row mb-8">
+        <button class="btn-primary" bindtap="queryData">读取参数</button>
+        <button class="btn-outline {{connected ? 'btn-danger' : ''}}" bindtap="toggleConnect">{{connected ? '断开' : '连接'}}</button>
       </view>
+
+      <view wx:if="{{valveTypeId === 'new'}}" class="mt-8">
+        <view class="form-item">
+          <text class="form-label">目标压力 KPa</text>
+          <view class="input-row">
+            <input class="form-input flex-1" type="digit" model:value="{{targetPressure}}" placeholder="0~250" />
+            <button class="btn-outline" bindtap="setTargetPressure">设定</button>
+          </view>
+        </view>
+        <view class="form-item">
+          <text class="form-label">进水补偿 KPa</text>
+          <view class="input-row">
+            <input class="form-input flex-1" type="digit" model:value="{{inletComp}}" placeholder="-120~120" />
+            <button class="btn-outline" bindtap="setPressureComp">补偿</button>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{valveTypeId === 'old'}}" class="mt-8">
+        <view class="form-item">
+          <text class="form-label">阀门开度 %</text>
+          <view class="input-row">
+            <input class="form-input flex-1" type="digit" model:value="{{targetOpening}}" placeholder="0~100" />
+            <button class="btn-outline" bindtap="setValveOpening">设定</button>
+          </view>
+        </view>
+        <view class="form-item">
+          <text class="form-label">工作模式</text>
+          <picker model:value="{{workModeIndex}}" range="{{workModes}}" bindchange="onWorkModeChange">
+            <view class="form-input">{{workModes[workModeIndex]}}</view>
+          </picker>
+          <button class="btn-outline mt-8" bindtap="setWorkMode">设定模式</button>
+        </view>
+      </view>
+
       <view class="action-row mt-8">
-        <button class="btn-outline btn-danger" bindtap="doDisconnect">断开连接</button>
+        <button class="btn-outline" bindtap="deviceReset">复位</button>
+        <button class="btn-outline" bindtap="deviceRestart">重启</button>
       </view>
     </view>
   </view>
@@ -52,51 +80,86 @@
 <script>
 import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
-import { connect, disconnect, write, onNotify, readDeviceInfo } from '../../services/ble/connector'
+import { startScan, stopScan } from '../../services/ble/scanner'
+import { connect, disconnect, write, onNotify } from '../../services/ble/connector'
 import { getProtocol } from '../../services/protocol/factory'
 import { voltageMvToV } from '../../utils/convert'
+
+const workModes = ['通断阀', '回水调节', '室内调节', '流量平衡', '停止']
+const workModeCodes = [0x81, 0x82, 0x83, 0x84, 0x89]
 
 createPage({
   data: {
     deviceName: '', valveTypeId: 'old', valveType: '智能调节阀',
-    connected: false, protocolData: {}, newFields: [], oldFields: [], deviceInfo: {}, deviceInfoArr: [], hasDeviceInfo: false,
+    connected: false, protocolData: {}, newFields: [], oldFields: [],
+    targetOpening: 50, targetPressure: '20', inletComp: '0',
+    workModeIndex: 1, workModes,
   },
   onLoad() {
     const device = useDeviceStore().currentDevice
     if (!device) { wx.navigateBack(); return }
+    this.deviceId = ''
+    const id = device.deviceId || ''
+    const last6 = id.slice(-6)
     this.setData({
-      deviceName: device.localName || device.deviceId,
+      deviceName: id,
       valveTypeId: device.valveTypeId || 'old',
       valveType: device.valveType || '智能调节阀',
     })
-    this.doConnect()
+    this.protocol = getProtocol(this.data.valveTypeId)
+    this.cmds = this.protocol.commands
+    this.autoFindAndConnect(last6)
   },
-  onUnload() { if (this.data.connected) disconnect() },
-  doConnect() {
-    const device = useDeviceStore().currentDevice
-    if (!device) return
+  onUnload() {
+    if (this.data.connected) disconnect()
+    stopScan()
+  },
+  autoFindAndConnect(filter) {
+    if (filter.includes(':')) { this.doConnect(filter); return }
+    filter = filter.toLowerCase()
+    const that = this
+    startScan({
+      onFound(found) {
+        const name = (found.localName || found.name || '').toLowerCase()
+        const addr = (found.deviceId || '').replace(/:/g, '').toLowerCase()
+        if (addr.includes(filter) || name.includes(filter)) {
+          stopScan()
+          that.doConnect(found.deviceId)
+        }
+      },
+      onError() {},
+    })
+  },
+  doConnect(deviceId) {
+    this.deviceId = deviceId
     const that = this
     wx.showLoading({ title: '连接中...' })
-    connect(device.deviceId).then(() => {
+    connect(deviceId).then(() => {
       that.setData({ connected: true })
       wx.hideLoading()
       wx.showToast({ title: '连接成功', icon: 'success' })
       const store = useDeviceStore()
-      store.addDevice({ ...device, connected: true, valveType: that.data.valveType, valveTypeId: that.data.valveTypeId })
-      readDeviceInfo().then((info) => {
-        const arr = Object.entries(info).filter(([, v]) => v).map(([key, value]) => ({ key, value }))
-        that.setData({ deviceInfo: info, deviceInfoArr: arr, hasDeviceInfo: arr.length > 0 })
-      })
-      const protocol = getProtocol(that.data.valveTypeId)
+      store.addDevice({ deviceId, localName: that.data.deviceName, connected: true, valveType: that.data.valveType, valveTypeId: that.data.valveTypeId })
       onNotify((frame) => {
-        const parsed = protocol.parseResponse(frame)
+        const parsed = that.protocol.parseResponse(frame)
         if (parsed) {
           const merged = { ...that.data.protocolData, ...parsed }
           that.setData({ protocolData: merged })
           that.refreshFields(merged)
         }
       })
-    }).catch((err) => { wx.hideLoading(); wx.showToast({ title: err.message, icon: 'none' }) })
+    }).catch((err) => {
+      wx.hideLoading()
+      wx.showToast({ title: err.message, icon: 'none' })
+    })
+  },
+  toggleConnect() {
+    this.data.connected ? this.doDisconnect() : this.doConnect(this.deviceId)
+  },
+  doDisconnect() {
+    disconnect()
+    this.setData({ connected: false, protocolData: {}, newFields: [], oldFields: [] })
+    wx.showToast({ title: '已断开' })
   },
   refreshFields(data) {
     if (this.data.valveTypeId === 'new') {
@@ -122,21 +185,53 @@ createPage({
       })
     }
   },
+  ensureConnected() {
+    if (this.data.connected) return Promise.resolve()
+    if (this.deviceId) return connect(this.deviceId).then(() => { this.setData({ connected: true }) })
+    return Promise.reject(new Error('未找到设备'))
+  },
   queryData() {
-    if (!this.data.connected) { wx.showToast({ title: '请先连接设备', icon: 'none' }); return }
-    const cmd = getProtocol(this.data.valveTypeId).commands.queryPage1()
-    wx.showLoading({ title: '发送中...' })
-    write(cmd).then(() => wx.hideLoading()).catch(() => { wx.hideLoading(); wx.showToast({ title: '发送失败', icon: 'none' }) })
+    this.ensureConnected().then(() => {
+      wx.showLoading({ title: '读取中...' })
+      return write(this.cmds.queryPage1())
+    }).then(() => wx.hideLoading()).catch((err) => {
+      wx.hideLoading()
+      if (err.message !== '发送失败') wx.showToast({ title: err.message, icon: 'none' })
+    })
   },
-  goDeviceInfo() {
-    const store = useDeviceStore()
-    store.setCurrentDevice({ ...store.currentDevice, connected: this.data.connected })
-    wx.navigateTo({ url: '/pages/device-info/index' })
+  onWorkModeChange(e) { this.setData({ workModeIndex: e.detail.value }) },
+  setValveOpening() {
+    const v = parseInt(this.data.targetOpening) || 0
+    if (v < 0 || v > 100) { wx.showToast({ title: '开度范围0-100', icon: 'none' }); return }
+    this.sendFrame(this.cmds.setOpening(v), '开度已设定')
   },
-  doDisconnect() {
-    disconnect()
-    this.setData({ connected: false })
-    wx.showToast({ title: '已断开' })
+  setWorkMode() {
+    this.sendFrame(this.cmds.setWorkMode(workModeCodes[this.data.workModeIndex]), '模式已设定')
+  },
+  setTargetPressure() {
+    const v = parseInt(this.data.targetPressure) || 0
+    if (v < 0 || v > 250) { wx.showToast({ title: '压力范围0-250KPa', icon: 'none' }); return }
+    this.sendFrame(this.cmds.setTargetPressure(Math.round(v / 10)), '压力已设定')
+  },
+  setPressureComp() {
+    const v = parseInt(this.data.inletComp) || 0
+    this.sendFrame(this.cmds.setPressureCompensation(v, v), '补偿已设定')
+  },
+  deviceReset() {
+    wx.showModal({ title: '确认', content: '确定复位设备？', success: (r) => { if (r.confirm) this.sendFrame(this.cmds.deviceReset(), '复位成功') } })
+  },
+  deviceRestart() {
+    wx.showModal({ title: '确认', content: '确定重启设备？', success: (r) => { if (r.confirm) this.sendFrame(this.cmds.deviceRestart(), '重启成功') } })
+  },
+  sendFrame(cmd, successMsg) {
+    this.ensureConnected().then(() => {
+      wx.showLoading({ title: '发送中...' })
+      return write(cmd)
+    }).then(() => {
+      wx.hideLoading(); wx.showToast({ title: successMsg, icon: 'success' })
+    }).catch((err) => {
+      wx.hideLoading(); wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+    })
   },
 })
 </script>
@@ -150,9 +245,14 @@ createPage({
 .action-row { display: flex; gap: 16rpx; }
 .action-row > button { flex: 1; }
 .btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
-.info-row { display: flex; padding: 8rpx 0; border-bottom: 2rpx solid var(--color-border); }
-.info-label { flex: 0 0 140rpx; font-size: 24rpx; color: var(--color-text-secondary); }
-.info-value { font-size: 24rpx; }
+.form-item { margin-bottom: 16rpx; }
+.form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
+.form-input { height: 64rpx; border: 2rpx solid var(--color-border); border-radius: var(--radius); padding: 0 16rpx; font-size: 26rpx; box-sizing: border-box; width: 100%; }
+.input-row { display: flex; gap: 16rpx; }
+.input-row .form-input { width: auto; flex: 1; }
+.input-row > button { flex-shrink: 0; padding: 0 24rpx; height: 64rpx; line-height: 64rpx; }
+.mb-8 { margin-bottom: 16rpx; }
+.mt-8 { margin-top: 16rpx; }
 </style>
 
 <script type="application/json">
