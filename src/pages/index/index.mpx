@@ -16,8 +16,9 @@
           <text class="device-name">{{item.localName || item.deviceId}}</text>
           <text class="tag tag-success ml-8">{{item.valveType || '智能调节阀'}}</text>
         </view>
-        <text class="text-sm text-secondary">{{item.lastSeenText}}</text>
+        <text class="tag {{item.connected ? 'tag-success' : 'tag-error'}}">{{item.connected ? '已连接' : '未连接'}}</text>
       </view>
+      <text class="text-sm text-secondary mt-8">{{item.lastSeenText}}</text>
     </view>
   </view>
 </template>

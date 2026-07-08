@@ -61,9 +61,7 @@ createPage({
   selectDevice(e) {
     const device = e.currentTarget.dataset.device
     this.stopScanInternal()
-    const store = useDeviceStore()
-    store.addDevice(device)
-    store.setCurrentDevice(device)
+    useDeviceStore().setCurrentDevice(device)
     wx.navigateTo({ url: '/pages/control/index' })
   },
   onUnload() { this.stopScanInternal() },

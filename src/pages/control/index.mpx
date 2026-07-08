@@ -34,6 +34,9 @@
         <button class="btn-outline" bindtap="queryData">查询参数</button>
         <button class="btn-primary" bindtap="goDeviceInfo">高级设置</button>
       </view>
+      <view class="action-row mt-8">
+        <button class="btn-outline btn-danger" bindtap="doDisconnect">断开连接</button>
+      </view>
     </view>
   </view>
 </template>
@@ -70,6 +73,8 @@ createPage({
       that.setData({ connected: true })
       wx.hideLoading()
       wx.showToast({ title: '连接成功', icon: 'success' })
+      const store = useDeviceStore()
+      store.addDevice({ ...device, connected: true, valveType: that.data.valveType, valveTypeId: that.data.valveTypeId })
       const protocol = getProtocol(that.data.valveTypeId)
       onNotify((frame) => {
         const parsed = protocol.parseResponse(frame)
@@ -116,6 +121,11 @@ createPage({
     store.setCurrentDevice({ ...store.currentDevice, connected: this.data.connected })
     wx.navigateTo({ url: '/pages/device-info/index' })
   },
+  doDisconnect() {
+    disconnect()
+    this.setData({ connected: false })
+    wx.showToast({ title: '已断开' })
+  },
 })
 </script>
 
@@ -127,6 +137,7 @@ createPage({
 .data-value { font-size: 32rpx; font-weight: 600; margin-top: 4rpx; display: block; }
 .action-row { display: flex; gap: 16rpx; }
 .action-row > button { flex: 1; }
+.btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
 </style>
 
 <script type="application/json">
