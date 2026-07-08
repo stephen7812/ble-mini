@@ -17,7 +17,10 @@
       <view class="flex-between">
         <view>
           <text class="device-name">{{item.localName || item.deviceId}}</text>
-          <text class="tag tag-success ml-8">{{item.valveType || '检测中...'}}</text>
+          <view class="flex-row mt-4">
+            <text class="tag {{item.valveType !== '未知设备' ? 'tag-success' : 'tag-warning'}} ml-8">{{item.valveType || '检测中...'}}</text>
+            <text wx:if="{{item.manufacturer}}" class="tag tag-info ml-8">{{item.manufacturer}}</text>
+          </view>
         </view>
         <text class="text-sm text-secondary">RSSI: {{item.RSSI}}dBm</text>
       </view>
@@ -31,6 +34,16 @@ import { useDeviceStore } from '../../stores/device'
 import { startScan, stopScan } from '../../services/ble/scanner'
 import { detectValveType } from '../../services/protocol/factory'
 
+const KNOWN_MANUFACTURERS = { 0x06B0: '黑蚂蚁', 0x004C: 'Apple', 0x0059: 'Nordic', 0x0006: 'Microsoft', 0x00E0: 'Google' }
+
+function getManufacturer(device) {
+  if (!device.advertisData) return ''
+  const buf = new Uint8Array(device.advertisData)
+  if (buf.length < 2) return ''
+  const id = (buf[1] << 8) | buf[0]
+  return KNOWN_MANUFACTURERS[id] || '厂商0x' + id.toString(16).padStart(4, '0')
+}
+
 createPage({
   data: { isScanning: false, devices: [] },
   toggleScan() {
@@ -42,9 +55,10 @@ createPage({
     startScan({
       onFound(device) {
         const valveType = detectValveType(device)
+        const manufacturer = getManufacturer(device)
         const devices = that.data.devices
         if (!devices.find(d => d.deviceId === device.deviceId)) {
-          devices.push({ ...device, valveType: valveType.type, valveTypeId: valveType.typeId })
+          devices.push({ ...device, valveType: valveType.type, valveTypeId: valveType.typeId, manufacturer })
           that.setData({ devices })
         }
       },
@@ -76,6 +90,9 @@ createPage({
 @keyframes pulse { 0%,100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
 .device-card { margin: 16rpx; }
 .device-name { font-size: 30rpx; font-weight: 500; }
+.flex-row { display: flex; align-items: center; flex-wrap: wrap; }
+.mt-4 { margin-top: 8rpx; }
+.tag-info { background: #e8f4fd; color: #1677ff; }
 .empty { text-align: center; margin-top: 60rpx; }
 </style>
 
