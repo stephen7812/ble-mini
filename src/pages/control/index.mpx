@@ -126,7 +126,7 @@ createPage({
 .data-label { font-size: 22rpx; color: var(--color-text-secondary); }
 .data-value { font-size: 32rpx; font-weight: 600; margin-top: 4rpx; display: block; }
 .action-row { display: flex; gap: 16rpx; }
-.action-row > * { flex: 1; }
+.action-row > button { flex: 1; }
 </style>
 
 <script type="application/json">
