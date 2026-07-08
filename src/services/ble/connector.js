@@ -69,6 +69,33 @@ export function onNotify(callback) {
   })
 }
 
+const DIS_SERVICE = '0000180a-0000-1000-8000-00805f9b34fb'
+const DIS_CHARS = [
+  { uuid: '00002a29-0000-1000-8000-00805f9b34fb', name: '厂商' },
+  { uuid: '00002a24-0000-1000-8000-00805f9b34fb', name: '型号' },
+  { uuid: '00002a26-0000-1000-8000-00805f9b34fb', name: '固件版本' },
+  { uuid: '00002a27-0000-1000-8000-00805f9b34fb', name: '硬件版本' },
+]
+
+export function readDeviceInfo() {
+  return new Promise((resolve) => {
+    const result = { label: '设备信息' }
+    let pending = DIS_CHARS.length
+    if (!pending) { resolve(result); return }
+    DIS_CHARS.forEach(({ uuid, name }) => {
+      wx.readBLECharacteristicValue({
+        deviceId, characteristicId: uuid, serviceId: DIS_SERVICE,
+        success(res) {
+          result[name] = new Uint8Array(res.value).reduce((s, b) => s + String.fromCharCode(b), '')
+        },
+        fail() {},
+        complete() { if (--pending <= 0) resolve(result) },
+      })
+    })
+    setTimeout(() => resolve(result), 1500)
+  })
+}
+
 export function disconnect() {
   if (deviceId) {
     wx.closeBLEConnection({ deviceId })

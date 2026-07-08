@@ -28,6 +28,14 @@
       </view>
     </view>
 
+    <view class="card" wx:if="{{connected && hasDeviceInfo}}">
+      <text class="text-sm font-bold mb-8">设备识别信息</text>
+      <view wx:for="{{deviceInfoArr}}" wx:key="key" class="info-row">
+        <text class="info-label">{{item.key}}</text>
+        <text class="info-value">{{item.value}}</text>
+      </view>
+    </view>
+
     <view class="card" wx:if="{{connected}}">
       <text class="text-sm font-bold mb-8">操作</text>
       <view class="action-row">
@@ -44,14 +52,14 @@
 <script>
 import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
-import { connect, disconnect, write, onNotify } from '../../services/ble/connector'
+import { connect, disconnect, write, onNotify, readDeviceInfo } from '../../services/ble/connector'
 import { getProtocol } from '../../services/protocol/factory'
 import { voltageMvToV } from '../../utils/convert'
 
 createPage({
   data: {
     deviceName: '', valveTypeId: 'old', valveType: '智能调节阀',
-    connected: false, protocolData: {}, newFields: [], oldFields: [],
+    connected: false, protocolData: {}, newFields: [], oldFields: [], deviceInfo: {}, deviceInfoArr: [], hasDeviceInfo: false,
   },
   onLoad() {
     const device = useDeviceStore().currentDevice
@@ -75,6 +83,10 @@ createPage({
       wx.showToast({ title: '连接成功', icon: 'success' })
       const store = useDeviceStore()
       store.addDevice({ ...device, connected: true, valveType: that.data.valveType, valveTypeId: that.data.valveTypeId })
+      readDeviceInfo().then((info) => {
+        const arr = Object.entries(info).filter(([, v]) => v).map(([key, value]) => ({ key, value }))
+        that.setData({ deviceInfo: info, deviceInfoArr: arr, hasDeviceInfo: arr.length > 0 })
+      })
       const protocol = getProtocol(that.data.valveTypeId)
       onNotify((frame) => {
         const parsed = protocol.parseResponse(frame)
@@ -138,6 +150,9 @@ createPage({
 .action-row { display: flex; gap: 16rpx; }
 .action-row > button { flex: 1; }
 .btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
+.info-row { display: flex; padding: 8rpx 0; border-bottom: 2rpx solid var(--color-border); }
+.info-label { flex: 0 0 140rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+.info-value { font-size: 24rpx; }
 </style>
 
 <script type="application/json">
