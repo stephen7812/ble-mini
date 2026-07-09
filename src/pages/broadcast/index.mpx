@@ -1,0 +1,1084 @@
+<template>
+  <view class="app">
+    <!-- ========= 内容区 ========= -->
+    <!-- 仪表盘 -->
+    <view wx:if="{{tab === 'dashboard'}}" class="tab-content">
+      <view class="db-header">
+        <view class="db-title-row">
+          <text class="db-title-label">设备地址</text>
+          <text class="db-title">{{deviceIdShort || '未连接'}}</text>
+        </view>
+        <view class="db-status {{discoveryStarted ? 'db-on' : 'db-off'}}">
+          <view class="db-dot"></view>
+          <text>{{bluetoothStatus}}</text>
+        </view>
+      </view>
+
+      <button class="db-read-btn" bindtap="startRead" disabled="{{readStatus.isReading}}">
+        <text wx:if="{{!readStatus.isReading}}">读取设备状态</text>
+        <text wx:if="{{readStatus.isReading}}">读取中…</text>
+      </button>
+
+      <view wx:if="{{deviceStatus.length > 0}}" class="db-cards">
+        <view wx:for="{{deviceStatus}}" wx:key="key" class="db-card">
+          <text class="db-card-val {{item.highlight ? 'db-highlight' : ''}}">{{item.value}}</text>
+          <text class="db-card-label">{{item.label}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{!deviceStatus.length && !readStatus.isReading}}" class="db-placeholder">
+        <text class="db-placeholder-icon">◉</text>
+        <text class="db-placeholder-text">点击上方按钮读取设备参数</text>
+      </view>
+    </view>
+
+    <!-- 控制 -->
+    <view wx:if="{{tab === 'control'}}" class="tab-content">
+      <view class="ctrl-section">
+        <text class="ctrl-section-title">快速操作</text>
+        <view class="ctrl-quick">
+          <button class="ctrl-btn ctrl-open" data-action="openAll" bindtap="sendControlCmd">
+            <text class="ctrl-btn-icon">▲</text>
+            <text class="ctrl-btn-label">全开</text>
+          </button>
+          <button class="ctrl-btn ctrl-close" data-action="closeAll" bindtap="sendControlCmd">
+            <text class="ctrl-btn-icon">▼</text>
+            <text class="ctrl-btn-label">全关</text>
+          </button>
+          <button class="ctrl-btn ctrl-reset" bindtap="execCmd('deviceReset','复位设备？')">
+            <text class="ctrl-btn-icon">⟳</text>
+            <text class="ctrl-btn-label">复位</text>
+          </button>
+        </view>
+      </view>
+
+      <!-- 旧阀设置 -->
+      <view wx:if="{{mode === 'old'}}" class="ctrl-section">
+        <text class="ctrl-section-title">参数设置</text>
+        <view class="ctrl-group">
+          <view class="ctrl-row">
+            <text class="ctrl-label">开度设定</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input" type="digit" model:value="{{p_opening}}" placeholder="0~100" />
+              <text class="ctrl-unit">%</text>
+              <button class="ctrl-set-btn" bindtap="execCmd('setOpening',null,[p_opening])">设定</button>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">工作模式</text>
+            <view class="ctrl-input-row">
+              <picker model:value="{{p_modeIdx}}" range="{{workModes}}" bindchange="p_modeIdx = $event.detail.value">
+                <view class="ctrl-picker">{{workModes[p_modeIdx]}}</view>
+              </picker>
+              <button class="ctrl-set-btn" bindtap="execCmd('setWorkMode',null,[workModeCodes[p_modeIdx]])">设定</button>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">开度限值</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_limitU}}" placeholder="上限" />
+              <text class="ctrl-unit">%</text>
+              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_limitL}}" placeholder="下限" />
+              <text class="ctrl-unit">%</text>
+              <button class="ctrl-set-btn" bindtap="execCmd('setOpeningLimits',null,[p_limitU,p_limitL])">设限</button>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">上报周期</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_spMin}}" placeholder="采样" />
+              <text class="ctrl-unit">分</text>
+              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_rpOnMin}}" placeholder="供暖" />
+              <text class="ctrl-unit">分</text>
+              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_rpOffDay}}" placeholder="非供暖" />
+              <text class="ctrl-unit">天</text>
+              <button class="ctrl-set-btn" bindtap="execCmd('setReportCycle',null,[p_spMin,p_rpOnMin,p_rpOffDay])">设定</button>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 新阀设置 -->
+      <view wx:if="{{mode === 'new'}}" class="ctrl-section">
+        <text class="ctrl-section-title">参数设置</text>
+        <view class="ctrl-group">
+          <view class="ctrl-row">
+            <text class="ctrl-label">目标压力</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input" type="digit" model:value="{{p_pressure}}" placeholder="0~250" />
+              <text class="ctrl-unit">KPa</text>
+              <button class="ctrl-set-btn" bindtap="sendTargetPressure">设定</button>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">阀门圈数</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input" type="digit" model:value="{{p_position}}" placeholder="0~255" />
+              <button class="ctrl-set-btn" bindtap="execCmd('syncValvePosition',null,[p_position])">同步</button>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">压力补偿</text>
+            <view class="ctrl-input-row">
+              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_compIn}}" placeholder="进水" />
+              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_compRet}}" placeholder="回水" />
+              <button class="ctrl-set-btn" bindtap="execCmd('setPressureCompensation',null,[p_compIn,p_compRet])">补偿</button>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 蓝牙配置 -->
+      <view class="ctrl-section">
+        <text class="ctrl-section-title">蓝牙配置</text>
+        <view class="ctrl-group">
+          <view class="ctrl-row">
+            <text class="ctrl-label">设备地址</text>
+            <input class="ctrl-input ctrl-input-wide" type="text" value="{{configAddress}}" bindinput="onAddressInput" placeholder="3-5字节HEX" />
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">广播信道</text>
+            <picker range="{{channels}}" bindchange="onChannelChange">
+              <view class="ctrl-picker">信道 {{channels[configChannel]}}</view>
+            </picker>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row" style="justify-content:flex-end;gap:12rpx;border:none">
+            <button class="ctrl-set-btn" bindtap="saveConfig">保存</button>
+            <button class="ctrl-set-btn ctrl-set-btn-secondary" wx:if="{{!bleReady}}" bindtap="initBleSvc">初始化</button>
+            <button class="ctrl-set-btn ctrl-set-btn-danger" wx:if="{{bleReady}}" bindtap="closeBleSvc">关闭</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 历史 -->
+    <view wx:if="{{tab === 'history'}}" class="tab-content">
+      <view class="hist-header">
+        <text class="hist-title">指令日志</text>
+        <text class="hist-clear" wx:if="{{logs.length}}" bindtap="clearLogs">清空</text>
+      </view>
+      <view wx:if="{{!logs.length}}" class="hist-empty">
+        <text>暂无日志</text>
+      </view>
+      <view wx:for="{{logs}}" wx:key="time" class="hist-item">
+        <view class="hist-top">
+          <text class="hist-time">{{item.time}}</text>
+          <view class="hist-tag {{item.dir}}">{{item.dir === 'recv' ? '接收' : '发送'}}</view>
+          <text class="hist-copy" bindtap="onCopy" data-hex="{{item.hex}}">复制</text>
+        </view>
+        <text class="hist-hex">{{item.hex}}</text>
+      </view>
+    </view>
+
+    <!-- ========= 底部导航 ========= -->
+    <view class="tabbar">
+      <view class="tabbar-item {{tab === 'dashboard' ? 'tabbar-active' : ''}}" bindtap="switchTab" data-tab="dashboard">
+        <text class="tabbar-icon">◉</text>
+        <text class="tabbar-label">仪表盘</text>
+      </view>
+      <view class="tabbar-item {{tab === 'control' ? 'tabbar-active' : ''}}" bindtap="switchTab" data-tab="control">
+        <text class="tabbar-icon">▣</text>
+        <text class="tabbar-label">控制</text>
+      </view>
+      <view class="tabbar-item {{tab === 'history' ? 'tabbar-active' : ''}}" bindtap="switchTab" data-tab="history">
+        <text class="tabbar-icon">☰</text>
+        <text class="tabbar-label">历史</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+import { getProtocol } from '../../services/protocol/factory'
+import { resetSeq } from '../../services/protocol/old-valve'
+import { generateData } from '../../services/beacon/bleUtil'
+
+const FILTER_NAME = 'ANTS'
+const MANUFACTURER_ID = '0x00C7'
+const AD_DURATION = 400
+const RESEND_DELAY = 1200
+const MAX_RETRIES = 3
+
+const workModes = ['通断阀', '回水调节', '室内调节', '流量平衡', '停止']
+const workModeCodes = [0x81, 0x82, 0x83, 0x84, 0x89]
+const channels = ['37', '38', '39']
+
+const OLD_MODE_MAP = { 0x81: '通断阀', 0x82: '回水调节', 0x83: '室内调节', 0x84: '流量平衡', 0x89: '停止' }
+
+function parseTemperature(hexStr) {
+  if (hexStr.length !== 4) return '--'
+  const bigEndian = hexStr.slice(2) + hexStr.slice(0, 2)
+  let num = parseInt(bigEndian, 16)
+  const isNegative = (num & 0x8000) !== 0
+  if (isNegative) num = -(num & 0x7FFF)
+  return `${(num / 100).toFixed(2)}℃`
+}
+
+const PAGE1_LAYOUT = [
+  { key: 'frameHeader', label: '帧头', start: 0, end: 2 },
+  { key: 'workMode', label: '工作模式', start: 2, end: 4,
+    parse: v => OLD_MODE_MAP[parseInt(v, 16)] || `${parseInt(v, 16)}` },
+  { key: 'valveOpenness', label: '阀门开度', start: 4, end: 6,
+    parse: v => `${parseInt(v, 16)}%` },
+  { key: 'valveSetOpenness', label: '设定开度', start: 6, end: 8,
+    parse: v => `${parseInt(v, 16)}%` },
+  { key: 'valveMaxOpenness', label: '开度上限', start: 8, end: 10,
+    parse: v => `${parseInt(v, 16)}%` },
+  { key: 'valveMinOpenness', label: '开度下限', start: 10, end: 12,
+    parse: v => `${parseInt(v, 16)}%` },
+  { key: 'sampleCycle', label: '采样周期', start: 12, end: 14,
+    parse: v => `${parseInt(v, 16)}×10分钟` },
+  { key: 'reportCycleHeating', label: '供暖上报周期', start: 14, end: 16,
+    parse: v => `${parseInt(v, 16)}×10分钟` },
+  { key: 'reportCycleNonHeating', label: '非供暖上报周期', start: 16, end: 18,
+    parse: v => `${parseInt(v, 16)}天` },
+  { key: 'inletTemp', label: '进水温度', start: 24, end: 28,
+    parse: parseTemperature },
+  { key: 'returnTemp', label: '回水温度', start: 28, end: 32,
+    parse: parseTemperature },
+]
+
+function ab2hex(buffer) {
+  const u8 = new Uint8Array(buffer)
+  return Array.from(u8).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('')
+}
+
+function toHex(arr) {
+  if (arr instanceof ArrayBuffer) arr = new Uint8Array(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function fmtTime() {
+  const d = new Date()
+  return d.toLocaleTimeString('zh-CN', { hour12: false })
+}
+
+createPage({
+  data: {
+    tab: 'dashboard',
+    deviceName: '', deviceType: '', deviceId: '', deviceIdShort: '',
+    mode: 'old',
+    bluetoothStatus: '待初始化', statusColorClass: 'status-default',
+    discoveryStarted: false, advertiseReady: false, advertiseStart: false, bleReady: false,
+    cmdLoading: false,
+    configAddress: '', configChannel: 0, channels,
+    p_opening: 50, p_modeIdx: 1, p_limitU: 100, p_limitL: 0,
+    p_pressure: '20', p_position: 0, p_compIn: '0', p_compRet: '0',
+    p_spMin: 30, p_rpOnMin: 30, p_rpOffDay: 3,
+    logs: [], workModes, workModeCodes,
+    deviceStatus: [],
+    updateTime: '',
+    readStatus: { isReading: false, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null },
+    readMode: 'single',
+  },
+  onLoad() {
+    resetSeq()
+    const device = useDeviceStore().currentDevice
+    if (!device) { wx.navigateBack(); return }
+    const id = device.deviceId || ''
+    const savedAddr = wx.getStorageSync('address') || ''
+    const addr = savedAddr || id.replace(/[^0-9a-fA-F]/g, '').slice(-6)
+    if (!savedAddr) wx.setStorageSync('address', addr)
+    this.setData({
+      deviceName: id,
+      deviceType: device.valveType || '',
+      deviceId: id,
+      deviceIdShort: id.slice(-6),
+      mode: device.valveTypeId || 'old',
+      configAddress: addr,
+      configChannel: Number(wx.getStorageSync('channel') || '37') - 37,
+    })
+    this.protocol = getProtocol(this.data.mode)
+    this.cmds = this.protocol.commands
+    this.loadLogs()
+    this.initBluetooth()
+  },
+  onUnload() {
+    this.clearTimer()
+    this.stopAdvertising()
+    this.stopDiscovery()
+    if (this._bleServer) {
+      this._bleServer.close().catch(() => {})
+    }
+    wx.closeBluetoothAdapter({ fail: () => {} })
+  },
+  clearTimer() {
+    const t = this.data.readStatus.timer
+    if (t) { clearTimeout(t); this.setData({ 'readStatus.timer': null }) }
+  },
+  updateStatus(text, cls) {
+    this.setData({ bluetoothStatus: text, statusColorClass: cls || '' })
+  },
+  initBluetooth() {
+    this.updateStatus('初始化蓝牙...', 'status-loading')
+    wx.openBluetoothAdapter({
+      success: () => {
+        this.updateStatus('蓝牙就绪', 'status-success')
+        this.initDiscovery()
+        this.initAdvertiseServer()
+      },
+      fail: () => { this.updateStatus('请开启蓝牙', 'status-error') }
+    })
+  },
+  initDiscovery() {
+    if (this.data.discoveryStarted) return
+    wx.startBluetoothDevicesDiscovery({
+      allowDuplicatesKey: true,
+      powerLevel: 'high',
+      success: () => {
+        this.setData({ discoveryStarted: true })
+        this.onBLEFound()
+      }
+    })
+  },
+  stopDiscovery() {
+    if (this.data.discoveryStarted) {
+      wx.stopBluetoothDevicesDiscovery({ fail: () => {} })
+      this.setData({ discoveryStarted: false })
+    }
+  },
+  initAdvertiseServer() {
+    wx.createBLEPeripheralServer().then(res => {
+      this._bleServer = res.server
+      this.setData({ advertiseReady: true })
+    }).catch(() => {})
+  },
+  onBLEFound() {
+    wx.onBluetoothDeviceFound(res => {
+      res.devices.forEach(device => {
+        if (device.localName !== FILTER_NAME) return
+        if (!device.advertisData) return
+        const hex = ab2hex(device.advertisData).substring(4)
+        const rssi = device.RSSI
+        this.logResp(hex)
+
+        const { isReading, page1Done, page2Done } = this.data.readStatus
+        const { readMode } = this.data
+
+        // 读模式下优先匹配 3F/3E
+        if (isReading) {
+          if (readMode === 'single') {
+            if (!page1Done && hex.slice(0, 2) === '3F') {
+              this.clearTimer()
+              this.setData({
+                'readStatus.page1Done': true,
+                'readStatus.page1Data': hex
+              })
+              this.updateDashboard(hex, rssi)
+              this.finishRead()
+              return
+            }
+          }
+          if (readMode === 'full') {
+            if (!page1Done) {
+              if (hex.slice(0, 2) === '3F') {
+                this.clearTimer()
+                this.setData({
+                  'readStatus.page1Done': true,
+                  'readStatus.page1Data': hex
+                })
+                this.updateDashboard(hex, rssi)
+                this.updateStatus('已收第一页，开始读取第二页', 'status-processing')
+                this.startPage2()
+                return
+              }
+            } else if (!page2Done) {
+              if (hex.slice(0, 2) === '3E') {
+                this.clearTimer()
+                this.setData({
+                  'readStatus.page2Done': true,
+                  'readStatus.page2Data': hex
+                })
+                this.updateDashboard(hex, rssi)
+                this.finishRead()
+                return
+              }
+            }
+          }
+        }
+
+        if (hex.slice(0, 2) === '3F') {
+          this.updateDashboard(hex, rssi)
+        }
+      })
+    })
+  },
+  startRead() {
+    if (!this.data.configAddress) {
+      wx.showToast({ title: '请配置设备地址', icon: 'none' })
+      return
+    }
+    if (this.data.readStatus.isReading) return
+    this._readRetries = 0
+    this.setData({
+      cmdLoading: true,
+      readMode: 'single',
+      readStatus: { isReading: true, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null }
+    })
+    this.updateStatus('正在读取状态...', 'status-processing')
+    this.loopPage1()
+  },
+  loopPage1() {
+    if (!this.data.readStatus.isReading || this.data.readStatus.page1Done) return
+    if (this._readRetries >= MAX_RETRIES) {
+      this.finishRead()
+      this.updateStatus('读取超时', 'status-error')
+      wx.showToast({ title: '读取超时，设备无响应', icon: 'none' })
+      return
+    }
+    this._readRetries++
+    this.sendCmd('queryPage1', () => {
+      this.setData({
+        'readStatus.timer': setTimeout(() => this.loopPage1(), RESEND_DELAY)
+      })
+    })
+  },
+  startPage2() {
+    this.updateStatus('正在读取第二页...', 'status-processing')
+    this.loopPage2()
+  },
+  loopPage2() {
+    if (!this.data.readStatus.isReading || this.data.readStatus.page2Done) return
+    this.loopPage2Cmd()
+  },
+  loopPage2Cmd() {
+    const seq = this.getSeq()
+    const cmd = '312A' + seq
+    this.sendRaw(cmd.padEnd(32, 'f'), () => {
+      this.setData({
+        'readStatus.timer': setTimeout(() => this.loopPage2Cmd(), RESEND_DELAY)
+      })
+    })
+  },
+  sendCmd(cmdKey, callback) {
+    const fn = this.cmds[cmdKey]
+    if (!fn) return
+    const cmd = fn()
+    const hex = toHex(cmd)
+    this.sendRaw(hex, callback)
+  },
+  sendRaw(hex, callback) {
+    this.stopAdvertising()
+    this.logCmd(hex)
+    const actPayload = generateData(hex)
+    if (!actPayload) { callback && callback(); return }
+    const buf = new ArrayBuffer(actPayload.length)
+    const view = new Uint8Array(buf)
+    for (let i = 0; i < actPayload.length; i++) {
+      view[i] = actPayload[i] < 0 ? actPayload[i] + 256 : actPayload[i]
+    }
+    const srv = this._bleServer
+    if (!srv) { callback && callback(); return }
+    srv.startAdvertising({
+      advertiseRequest: {
+        connectable: true,
+        deviceName: '',
+        manufacturerData: [{ manufacturerId: MANUFACTURER_ID, manufacturerSpecificData: buf }],
+      },
+      powerLevel: 'high',
+    }).then(() => {
+      this.setData({ advertiseStart: true })
+      setTimeout(() => {
+        this.stopAdvertising()
+        callback && callback()
+      }, AD_DURATION)
+    }).catch(() => { callback && callback() })
+  },
+  stopAdvertising() {
+    if (this._bleServer) {
+      this._bleServer.stopAdvertising().catch(() => {})
+    }
+    this.setData({ advertiseStart: false })
+  },
+  getSeq() {
+    const map = '0123456789abcdef'
+    const c = map[(this._seq || 0) % 16]
+    this._seq = (this._seq || 0) + 1
+    return c
+  },
+  doParse(hex) {
+    const p1 = hex || this.data.readStatus.page1Data
+    if (!p1) return
+    const status1 = PAGE1_LAYOUT.filter(i => i.parse).map(i => ({
+      key: i.key, label: i.label, value: i.parse(p1.slice(i.start, i.end))
+    }))
+    const sync = {
+      p_opening: parseInt(p1.slice(6, 8), 16) || 0,
+      p_limitU: parseInt(p1.slice(8, 10), 16) || 100,
+      p_limitL: parseInt(p1.slice(10, 12), 16) || 0,
+    }
+    this.setData({
+      deviceStatus: status1,
+      updateTime: new Date().toLocaleString(),
+      ...sync
+    })
+  },
+  updateDashboard(hex, rssi) {
+    this._lastRssi = rssi
+    if (hex.slice(0, 2) === '3F' && hex.length >= 32) {
+      this.doParse(hex)
+    } else {
+      this.setData({
+        deviceStatus: [
+          { key: 'rssi', label: '信号强度', value: (rssi || 0) + ' dBm' },
+          { key: 'raw', label: '原始数据', value: hex }
+        ],
+        updateTime: new Date().toLocaleString()
+      })
+    }
+  },
+  finishRead() {
+    this.clearTimer()
+    if (this._readTimeout) { clearTimeout(this._readTimeout); this._readTimeout = null }
+    this.stopAdvertising()
+    this.setData({
+      cmdLoading: false,
+      readStatus: { isReading: false, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null }
+    })
+    this.updateStatus('读取完成', 'status-success')
+  },
+
+  /* ========== Send 控制指令（不用回读） ========== */
+  sendTargetPressure() {
+    const v = Math.round(Number(this.data.p_pressure) / 10) || 0
+    if (v < 0 || v > 25) { wx.showToast({ title: '压力范围0~250KPa', icon: 'none' }); return }
+    this.execCmd('setTargetPressure', null, [v])
+  },
+  sendControlCmd(e) {
+    const action = e.currentTarget.dataset.action
+    if (!this.data.configAddress || this.data.cmdLoading) return
+    this.setData({ cmdLoading: true })
+    const cmd = this.buildCtrlCmd(action)
+    if (!cmd) { this.setData({ cmdLoading: false }); return }
+    this.sendRaw(cmd, () => {
+      this.setData({ cmdLoading: false })
+      this.updateStatus('指令已发送', 'status-success')
+    })
+  },
+  buildCtrlCmd(action) {
+    const seq = this.getSeq()
+    let cmd
+    switch (action) {
+      case 'openAll': cmd = '221' + seq + '64'; break
+      case 'closeAll': cmd = '221' + seq + '00'; break
+      case 'setOpening':
+        const v = parseInt(this.data.p_opening)
+        if (isNaN(v) || v < 0 || v > 100) return null
+        cmd = '221' + seq + ('0' + v.toString(16)).slice(-2); break
+      default: return null
+    }
+    return cmd.padEnd(32, 'f')
+  },
+
+  /* ========== 配置相关 ========== */
+  toggleConfig() { this.setData({ showConfig: !this.data.showConfig }) },
+  onAddressInput(e) {
+    const val = e.detail.value.replace(/\s+/g, '')
+    this.setData({ configAddress: val })
+    this.autoSaveConfig()
+  },
+  onChannelChange(e) {
+    this.setData({ configChannel: e.detail.value })
+    this.autoSaveConfig()
+  },
+  autoSaveConfig() {
+    const addr = (this.data.configAddress || '').replace(/\s+/g, '')
+    if (addr.length < 6 || addr.length > 10 || addr.length % 2 !== 0) return
+    wx.setStorageSync('address', addr)
+    wx.setStorageSync('channel', channels[this.data.configChannel])
+  },
+  saveConfig() {
+    this.autoSaveConfig()
+    wx.showToast({ title: '配置已保存' })
+  },
+  loadLogs() {
+    const logs = wx.getStorageSync('broadcastHistory') || []
+    this.setData({ logs })
+  },
+  saveLogs() {
+    wx.setStorageSync('broadcastHistory', this.data.logs)
+  },
+  logCmd(hex) {
+    const records = this.data.logs
+    records.unshift({ name: '发送指令', hex, time: fmtTime(), ok: true, dir: 'send' })
+    if (records.length > 50) records.length = 50
+    this.setData({ logs: records })
+    this.saveLogs()
+  },
+  logResp(hex) {
+    const records = this.data.logs
+    records.unshift({ name: '收到广播', hex, time: fmtTime(), ok: true, dir: 'recv' })
+    if (records.length > 50) records.length = 50
+    this.setData({ logs: records })
+    this.saveLogs()
+  },
+  switchTab(e) {
+    this.setData({ tab: e.currentTarget.dataset.tab })
+  },
+  initBle() {
+    return new Promise((resolve, reject) => {
+      if (this._bleReady) { resolve(); return }
+      wx.openBluetoothAdapter({
+        success: () => {
+          wx.createBLEPeripheralServer().then(res => {
+            this._bleServer = res.server
+            this._bleReady = true
+            this.setData({ bleReady: true })
+            resolve()
+          }).catch(reject)
+        },
+        fail: (err) => { reject(new Error('蓝牙初始化失败: ' + err.errMsg)) }
+      })
+    })
+  },
+  initBleSvc() {
+    wx.showLoading({ title: '初始化...' })
+    this.initBle().then(() => {
+      wx.hideLoading()
+      wx.showToast({ title: '蓝牙已就绪', icon: 'success' })
+    }).catch(err => {
+      wx.hideLoading()
+      wx.showToast({ icon: 'none', title: err.message })
+    })
+  },
+  closeBleSvc() {
+    if (this._bleServer) {
+      this._bleServer.stopAdvertising().catch(() => {})
+      this._bleServer.close().then(() => {
+        this._bleServer = null
+        this._bleReady = false
+        this.setData({ bleReady: false })
+      }).catch(() => {
+        this._bleServer = null
+        this._bleReady = false
+        this.setData({ bleReady: false })
+      })
+    }
+    wx.showToast({ title: '蓝牙已关闭' })
+  },
+  execCmd(cmdKey, confirmMsg, params) {
+    if (confirmMsg) {
+      const that = this
+      wx.showModal({ title: '确认', content: confirmMsg, success(r) {
+        if (r.confirm) that.execCmd(cmdKey, null, params)
+      }})
+      return
+    }
+    const fn = this.cmds[cmdKey]
+    if (!fn) { wx.showToast({ title: '未知指令', icon: 'none' }); return }
+    let cmd
+    if (params) {
+      const nums = params.map(p => Number(p) || 0)
+      cmd = fn(...nums)
+    } else {
+      cmd = fn()
+    }
+    const hex = toHex(cmd)
+    this.sendRaw(hex, () => {
+      wx.vibrateShort({ type: 'light' })
+    })
+  },
+  onCopy(e) {
+    wx.setClipboardData({ data: e.currentTarget.dataset.hex })
+    wx.showToast({ title: '已复制', icon: 'success' })
+  },
+  clearLogs() {
+    resetSeq()
+    this.setData({ logs: [] })
+    wx.setStorageSync('broadcastHistory', [])
+  },
+})
+</script>
+
+<style scoped>
+/* ========== Design Tokens ========== */
+.app {
+  --blue: #007AFF;
+  --blue-light: #E1F0FF;
+  --green: #34C759;
+  --red: #FF3B30;
+  --orange: #FF9500;
+  --gray6: #F2F2F7;
+  --gray5: #E5E5EA;
+  --gray4: #D1D1D6;
+  --gray3: #C7C7CC;
+  --gray2: #AEAEB2;
+  --gray: #8E8E93;
+  --label: #1C1C1E;
+  --secondary: #3A3A3C;
+  --tertiary: #8E8E93;
+  --card-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+  --radius: 14rpx;
+
+  background: var(--gray6);
+  min-height: 100vh;
+  padding: 0 0 120rpx 0;
+}
+
+/* ========== 内容区 ========== */
+.tab-content {
+  padding: 24rpx 20rpx;
+}
+
+/* ========== 仪表盘 ========== */
+.db-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28rpx;
+}
+.db-title-row {
+  display: flex;
+  flex-direction: column;
+}
+.db-title-label {
+  font-size: 22rpx;
+  color: var(--tertiary);
+  margin-bottom: 2rpx;
+}
+.db-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--label);
+  letter-spacing: -0.5rpx;
+}
+.db-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 30rpx;
+}
+.db-on {
+  background: rgba(52,199,89,0.12);
+  color: var(--green);
+}
+.db-off {
+  background: rgba(142,142,147,0.12);
+  color: var(--gray);
+}
+.db-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+}
+.db-on .db-dot { background: var(--green); }
+.db-off .db-dot { background: var(--gray); }
+
+.db-read-btn {
+  width: 100%;
+  height: 96rpx;
+  background: var(--blue);
+  border-radius: 14rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0,122,255,0.3);
+  border: none;
+}
+.db-read-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.db-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+}
+.db-card {
+  background: #FFF;
+  border-radius: var(--radius);
+  padding: 20rpx 16rpx;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+}
+.db-card-val {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--label);
+  display: block;
+  margin-bottom: 4rpx;
+}
+.db-highlight {
+  color: var(--blue);
+}
+.db-card-label {
+  font-size: 20rpx;
+  color: var(--tertiary);
+  display: block;
+}
+
+.db-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0;
+}
+.db-placeholder-icon {
+  font-size: 64rpx;
+  color: var(--gray4);
+  margin-bottom: 16rpx;
+}
+.db-placeholder-text {
+  font-size: 26rpx;
+  color: var(--gray2);
+}
+
+/* ========== 控制 ========== */
+.ctrl-section {
+  margin-bottom: 32rpx;
+}
+.ctrl-section-title {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--tertiary);
+  text-transform: uppercase;
+  letter-spacing: 1rpx;
+  margin-bottom: 12rpx;
+  padding: 0 4rpx;
+}
+.ctrl-quick {
+  display: flex;
+  gap: 12rpx;
+}
+.ctrl-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 28rpx 8rpx;
+  background: #FFF;
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  border: none;
+  transition: all 0.15s;
+}
+.ctrl-btn:active {
+  transform: scale(0.96);
+  opacity: 0.8;
+}
+.ctrl-btn-icon {
+  font-size: 36rpx;
+}
+.ctrl-btn-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--label);
+}
+.ctrl-open .ctrl-btn-icon { color: var(--green); }
+.ctrl-close .ctrl-btn-icon { color: var(--red); }
+.ctrl-reset .ctrl-btn-icon { color: var(--orange); }
+
+.ctrl-group {
+  background: #FFF;
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 20rpx;
+  border-bottom: 0.5rpx solid var(--gray5);
+}
+.ctrl-row:last-child { border-bottom: none; }
+.ctrl-label {
+  font-size: 28rpx;
+  color: var(--label);
+  flex-shrink: 0;
+  margin-right: 16rpx;
+}
+.ctrl-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex: 1;
+  justify-content: flex-end;
+}
+.ctrl-input {
+  height: 64rpx;
+  background: var(--gray6);
+  border: none;
+  border-radius: 10rpx;
+  padding: 0 14rpx;
+  font-size: 26rpx;
+  color: var(--label);
+  text-align: right;
+  width: 100rpx;
+  box-sizing: border-box;
+}
+.ctrl-input-sm { width: 90rpx; }
+.ctrl-input-xs { width: 80rpx; }
+.ctrl-input-wide { width: 100%; text-align: left; }
+.ctrl-unit {
+  font-size: 24rpx;
+  color: var(--tertiary);
+  width: 40rpx;
+}
+.ctrl-picker {
+  height: 64rpx;
+  background: var(--gray6);
+  border-radius: 10rpx;
+  padding: 0 14rpx;
+  font-size: 26rpx;
+  color: var(--label);
+  display: flex;
+  align-items: center;
+  min-width: 160rpx;
+}
+.ctrl-set-btn {
+  height: 56rpx;
+  padding: 0 24rpx;
+  background: var(--blue);
+  border: none;
+  border-radius: 10rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #FFF;
+  flex-shrink: 0;
+}
+.ctrl-set-btn:active {
+  opacity: 0.8;
+}
+.ctrl-set-btn-secondary {
+  background: var(--gray6);
+  color: var(--blue);
+}
+.ctrl-set-btn-danger {
+  background: var(--gray6);
+  color: var(--red);
+}
+.ctrl-divider {
+  height: 0.5rpx;
+  background: var(--gray5);
+  margin: 0 20rpx;
+}
+
+/* ========== 历史 ========== */
+.hist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.hist-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--label);
+}
+.hist-clear {
+  font-size: 26rpx;
+  color: var(--blue);
+  padding: 8rpx;
+}
+.hist-empty {
+  text-align: center;
+  padding: 80rpx 0;
+  font-size: 26rpx;
+  color: var(--gray2);
+}
+.hist-item {
+  background: #FFF;
+  border-radius: var(--radius);
+  padding: 16rpx 20rpx;
+  margin-bottom: 10rpx;
+  box-shadow: var(--card-shadow);
+}
+.hist-top {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 8rpx;
+}
+.hist-time {
+  font-size: 22rpx;
+  color: var(--tertiary);
+}
+.hist-tag {
+  font-size: 18rpx;
+  font-weight: 500;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+}
+.hist-tag.send {
+  background: rgba(0,122,255,0.1);
+  color: var(--blue);
+}
+.hist-tag.recv {
+  background: rgba(52,199,89,0.1);
+  color: var(--green);
+}
+.hist-copy {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: var(--tertiary);
+  padding: 4rpx 12rpx;
+  border: 0.5rpx solid var(--gray4);
+  border-radius: 8rpx;
+}
+.hist-hex {
+  font-size: 20rpx;
+  color: var(--secondary);
+  font-family: 'SF Mono', 'Menlo', monospace;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* ========== 底部 Tab Bar ========== */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100rpx;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(20rpx);
+  -webkit-backdrop-filter: blur(20rpx);
+  border-top: 0.5rpx solid var(--gray4);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.tabbar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx 24rpx;
+}
+.tabbar-icon {
+  font-size: 36rpx;
+  color: var(--gray);
+}
+.tabbar-label {
+  font-size: 18rpx;
+  color: var(--gray);
+}
+.tabbar-active .tabbar-icon,
+.tabbar-active .tabbar-label {
+  color: var(--blue);
+}
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "智能阀门 · 远程控制" }
+</script>
