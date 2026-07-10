@@ -76,7 +76,7 @@ createPage({
     const device = e.currentTarget.dataset.device
     this.stopScanInternal()
     useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/control/index' })
+    wx.navigateTo({ url: '/pages/broadcast/index' })
   },
   onUnload() { this.stopScanInternal() },
 })

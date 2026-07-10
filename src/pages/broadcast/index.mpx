@@ -1,16 +1,22 @@
 <template>
-  <view class="app">
+  <view class="app {{darkMode ? 'dark' : ''}}">
     <!-- ========= 内容区 ========= -->
     <!-- 仪表盘 -->
     <view wx:if="{{tab === 'dashboard'}}" class="tab-content">
       <view class="db-header">
         <view class="db-title-row">
-          <text class="db-title-label">设备地址</text>
-          <text class="db-title">{{deviceIdShort || '未连接'}}</text>
+          <text class="db-title-label">设备编号</text>
+          <text class="db-title">{{deviceId || '未连接'}}</text>
         </view>
-        <view class="db-status {{discoveryStarted ? 'db-on' : 'db-off'}}">
-          <view class="db-dot"></view>
-          <text>{{bluetoothStatus}}</text>
+        <view class="db-header-right">
+          <view class="db-status {{discoveryStarted ? 'db-on' : 'db-off'}}">
+            <view class="db-dot"></view>
+            <text>{{bluetoothStatus}}</text>
+          </view>
+          <view class="theme-toggle" bindtap="toggleTheme">
+            <text wx:if="{{!darkMode}}">☀️</text>
+            <text wx:if="{{darkMode}}">🌙</text>
+          </view>
         </view>
       </view>
 
@@ -55,81 +61,111 @@
       <!-- 旧阀设置 -->
       <view wx:if="{{mode === 'old'}}" class="ctrl-section">
         <text class="ctrl-section-title">参数设置</text>
-        <view class="ctrl-group">
-          <view class="ctrl-row">
-            <text class="ctrl-label">开度设定</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input" type="digit" model:value="{{p_opening}}" placeholder="0~100" />
-              <text class="ctrl-unit">%</text>
-              <button class="ctrl-set-btn" bindtap="execCmd('setOpening',null,[p_opening])">设定</button>
+
+        <view class="pf-field">
+          <view class="pf-row">
+            <text class="pf-label">开度设定</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_opening}}" placeholder="0~100" />
+              <text class="pf-unit">%</text>
             </view>
           </view>
-          <view class="ctrl-divider"></view>
-          <view class="ctrl-row">
-            <text class="ctrl-label">工作模式</text>
-            <view class="ctrl-input-row">
-              <picker model:value="{{p_modeIdx}}" range="{{workModes}}" bindchange="p_modeIdx = $event.detail.value">
-                <view class="ctrl-picker">{{workModes[p_modeIdx]}}</view>
+          <button class="pf-btn" bindtap="execCmd('setOpening',null,[p_opening])">设定</button>
+        </view>
+
+        <view class="pf-field">
+          <view class="pf-row">
+            <text class="pf-label">工作模式</text>
+            <view class="pf-inp">
+              <picker model:value="{{p_modeIdx}}" range="{{workModes}}" bindchange="p_modeIdx = $event.detail.value" style="flex:1">
+                <view class="pf-input">{{workModes[p_modeIdx]}}</view>
               </picker>
-              <button class="ctrl-set-btn" bindtap="execCmd('setWorkMode',null,[workModeCodes[p_modeIdx]])">设定</button>
             </view>
           </view>
-          <view class="ctrl-divider"></view>
-          <view class="ctrl-row">
-            <text class="ctrl-label">开度限值</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_limitU}}" placeholder="上限" />
-              <text class="ctrl-unit">%</text>
-              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_limitL}}" placeholder="下限" />
-              <text class="ctrl-unit">%</text>
-              <button class="ctrl-set-btn" bindtap="execCmd('setOpeningLimits',null,[p_limitU,p_limitL])">设限</button>
+          <button class="pf-btn" bindtap="execCmd('setWorkMode',null,[workModeCodes[p_modeIdx]])">设定</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">开度限制</text>
+          <view class="pf-row">
+            <text class="pf-label">最大开度</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_limitU}}" placeholder="0~100" />
+              <text class="pf-unit">%</text>
             </view>
           </view>
-          <view class="ctrl-divider"></view>
-          <view class="ctrl-row">
-            <text class="ctrl-label">上报周期</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_spMin}}" placeholder="采样" />
-              <text class="ctrl-unit">分</text>
-              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_rpOnMin}}" placeholder="供暖" />
-              <text class="ctrl-unit">分</text>
-              <input class="ctrl-input ctrl-input-xs" type="digit" model:value="{{p_rpOffDay}}" placeholder="非供暖" />
-              <text class="ctrl-unit">天</text>
-              <button class="ctrl-set-btn" bindtap="execCmd('setReportCycle',null,[p_spMin,p_rpOnMin,p_rpOffDay])">设定</button>
+          <view class="pf-row">
+            <text class="pf-label">最小开度</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_limitL}}" placeholder="0~100" />
+              <text class="pf-unit">%</text>
             </view>
           </view>
+          <button class="pf-btn" bindtap="execCmd('setOpeningLimits',null,[p_limitU,p_limitL])">设限</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">上报周期</text>
+          <view class="pf-row">
+            <text class="pf-label">采样周期</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_spMin}}" placeholder="采样周期" />
+              <text class="pf-unit">分</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">供暖上报</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_rpOnMin}}" placeholder="供暖上报" />
+              <text class="pf-unit">分</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">非供暖上报</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_rpOffDay}}" placeholder="非供暖上报" />
+              <text class="pf-unit">天</text>
+            </view>
+          </view>
+          <button class="pf-btn" bindtap="execCmd('setReportCycle',null,[p_spMin,p_rpOnMin,p_rpOffDay])">设定</button>
         </view>
       </view>
 
       <!-- 新阀设置 -->
       <view wx:if="{{mode === 'new'}}" class="ctrl-section">
         <text class="ctrl-section-title">参数设置</text>
-        <view class="ctrl-group">
-          <view class="ctrl-row">
-            <text class="ctrl-label">目标压力</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input" type="digit" model:value="{{p_pressure}}" placeholder="0~250" />
-              <text class="ctrl-unit">KPa</text>
-              <button class="ctrl-set-btn" bindtap="sendTargetPressure">设定</button>
+
+        <view class="pf-field">
+          <view class="pf-row">
+            <text class="pf-label">目标压力</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_pressure}}" placeholder="0~250" />
+              <text class="pf-unit">KPa</text>
             </view>
           </view>
-          <view class="ctrl-divider"></view>
-          <view class="ctrl-row">
-            <text class="ctrl-label">阀门圈数</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input" type="digit" model:value="{{p_position}}" placeholder="0~255" />
-              <button class="ctrl-set-btn" bindtap="execCmd('syncValvePosition',null,[p_position])">同步</button>
+          <button class="pf-btn" bindtap="sendTargetPressure">设定</button>
+        </view>
+
+        <view class="pf-field">
+          <view class="pf-row">
+            <text class="pf-label">阀门圈数</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_position}}" placeholder="0~255" />
             </view>
           </view>
-          <view class="ctrl-divider"></view>
-          <view class="ctrl-row">
-            <text class="ctrl-label">压力补偿</text>
-            <view class="ctrl-input-row">
-              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_compIn}}" placeholder="进水" />
-              <input class="ctrl-input ctrl-input-sm" type="digit" model:value="{{p_compRet}}" placeholder="回水" />
-              <button class="ctrl-set-btn" bindtap="execCmd('setPressureCompensation',null,[p_compIn,p_compRet])">补偿</button>
+          <button class="pf-btn" bindtap="execCmd('syncValvePosition',null,[p_position])">同步</button>
+        </view>
+
+        <view class="pf-field">
+          <view class="pf-row">
+            <text class="pf-label">压力补偿</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_compIn}}" placeholder="进水补偿" />
+              <text class="pf-unit">/</text>
+              <input class="pf-input" type="digit" model:value="{{p_compRet}}" placeholder="回水补偿" />
             </view>
           </view>
+          <button class="pf-btn" bindtap="execCmd('setPressureCompensation',null,[p_compIn,p_compRet])">补偿</button>
         </view>
       </view>
 
@@ -139,7 +175,7 @@
         <view class="ctrl-group">
           <view class="ctrl-row">
             <text class="ctrl-label">设备地址</text>
-            <input class="ctrl-input ctrl-input-wide" type="text" value="{{configAddress}}" bindinput="onAddressInput" placeholder="3-5字节HEX" />
+            <view class="ctrl-addr">{{configAddress}}</view>
           </view>
           <view class="ctrl-divider"></view>
           <view class="ctrl-row">
@@ -149,10 +185,8 @@
             </picker>
           </view>
           <view class="ctrl-divider"></view>
-          <view class="ctrl-row" style="justify-content:flex-end;gap:12rpx;border:none">
-            <button class="ctrl-set-btn" bindtap="saveConfig">保存</button>
-            <button class="ctrl-set-btn ctrl-set-btn-secondary" wx:if="{{!bleReady}}" bindtap="initBleSvc">初始化</button>
-            <button class="ctrl-set-btn ctrl-set-btn-danger" wx:if="{{bleReady}}" bindtap="closeBleSvc">关闭</button>
+          <view class="ctrl-row" style="justify-content:flex-end;border:none">
+            <button class="ctrl-set-btn ctrl-set-btn-danger" bindtap="closeBleSvc">关闭蓝牙</button>
           </view>
         </view>
       </view>
@@ -264,6 +298,7 @@ function fmtTime() {
 
 createPage({
   data: {
+    darkMode: false,
     tab: 'dashboard',
     deviceName: '', deviceType: '', deviceId: '', deviceIdShort: '',
     mode: 'old',
@@ -282,25 +317,27 @@ createPage({
   },
   onLoad() {
     resetSeq()
-    const device = useDeviceStore().currentDevice
+    const store = useDeviceStore()
+    const device = store.currentDevice
     if (!device) { wx.navigateBack(); return }
     const id = device.deviceId || ''
-    const savedAddr = wx.getStorageSync('address') || ''
-    const addr = savedAddr || id.replace(/[^0-9a-fA-F]/g, '').slice(-6)
-    if (!savedAddr) wx.setStorageSync('address', addr)
     this.setData({
+      darkMode: store.darkMode,
       deviceName: id,
       deviceType: device.valveType || '',
       deviceId: id,
       deviceIdShort: id.slice(-6),
+      configAddress: id.slice(-6),
       mode: device.valveTypeId || 'old',
-      configAddress: addr,
-      configChannel: Number(wx.getStorageSync('channel') || '37') - 37,
+      configChannel: 0,
     })
     this.protocol = getProtocol(this.data.mode)
     this.cmds = this.protocol.commands
     this.loadLogs()
     this.initBluetooth()
+  },
+  onShow() {
+    this.setData({ darkMode: useDeviceStore().darkMode })
   },
   onUnload() {
     this.clearTimer()
@@ -511,10 +548,16 @@ createPage({
     const status1 = PAGE1_LAYOUT.filter(i => i.parse).map(i => ({
       key: i.key, label: i.label, value: i.parse(p1.slice(i.start, i.end))
     }))
+    const rawMode = parseInt(p1.slice(2, 4), 16)
+    const modeIdx = workModeCodes.indexOf(rawMode)
     const sync = {
       p_opening: parseInt(p1.slice(6, 8), 16) || 0,
       p_limitU: parseInt(p1.slice(8, 10), 16) || 100,
       p_limitL: parseInt(p1.slice(10, 12), 16) || 0,
+      p_spMin: parseInt(p1.slice(12, 14), 16) * 10 || 30,
+      p_rpOnMin: parseInt(p1.slice(14, 16), 16) * 10 || 30,
+      p_rpOffDay: parseInt(p1.slice(16, 18), 16) || 3,
+      p_modeIdx: modeIdx >= 0 ? modeIdx : 0,
     }
     this.setData({
       deviceStatus: status1,
@@ -581,24 +624,8 @@ createPage({
 
   /* ========== 配置相关 ========== */
   toggleConfig() { this.setData({ showConfig: !this.data.showConfig }) },
-  onAddressInput(e) {
-    const val = e.detail.value.replace(/\s+/g, '')
-    this.setData({ configAddress: val })
-    this.autoSaveConfig()
-  },
   onChannelChange(e) {
     this.setData({ configChannel: e.detail.value })
-    this.autoSaveConfig()
-  },
-  autoSaveConfig() {
-    const addr = (this.data.configAddress || '').replace(/\s+/g, '')
-    if (addr.length < 6 || addr.length > 10 || addr.length % 2 !== 0) return
-    wx.setStorageSync('address', addr)
-    wx.setStorageSync('channel', channels[this.data.configChannel])
-  },
-  saveConfig() {
-    this.autoSaveConfig()
-    wx.showToast({ title: '配置已保存' })
   },
   loadLogs() {
     const logs = wx.getStorageSync('broadcastHistory') || []
@@ -620,6 +647,11 @@ createPage({
     if (records.length > 50) records.length = 50
     this.setData({ logs: records })
     this.saveLogs()
+  },
+  toggleTheme() {
+    const store = useDeviceStore()
+    store.toggleDarkMode()
+    this.setData({ darkMode: store.darkMode })
   },
   switchTab(e) {
     this.setData({ tab: e.currentTarget.dataset.tab })
@@ -700,56 +732,134 @@ createPage({
 </script>
 
 <style scoped>
-/* ========== Design Tokens ========== */
+/* ====================================================================
+   THEME:  SPRING (light, default)
+   ================================================================ */
 .app {
-  --blue: #007AFF;
-  --blue-light: #E1F0FF;
-  --green: #34C759;
-  --red: #FF3B30;
-  --orange: #FF9500;
-  --gray6: #F2F2F7;
-  --gray5: #E5E5EA;
-  --gray4: #D1D1D6;
-  --gray3: #C7C7CC;
-  --gray2: #AEAEB2;
-  --gray: #8E8E93;
-  --label: #1C1C1E;
-  --secondary: #3A3A3C;
-  --tertiary: #8E8E93;
-  --card-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+  --bg: #F5F7F0;
+  --surface: #FFFFFF;
+  --surface-alt: #EDF2E8;
+  --border: #DCE3D4;
+  --label: #2D3A2D;
+  --secondary: #4A5D4A;
+  --tertiary: #8A9A8A;
+  --spring-green: #6BAA5E;
+  --spring-green-dim: #8FC883;
+  --spring-green-bright: #4F9A42;
+  --sky: #7BB8D9;
+  --sky-bright: #5AA3CC;
+  --warm-orange: #E8A87C;
+  --warm-coral: #D4896B;
+  --rose: #D4A0A0;
+  --gold: #C9A84C;
+  --card-shadow: 0 2rpx 14rpx rgba(45,58,45,0.07);
+  --radius-sm: 10rpx;
   --radius: 14rpx;
+  --radius-lg: 20rpx;
+  --font-mono: 'SF Mono', 'Menlo', monospace;
+  --tag-send-bg: rgba(107,170,94,0.12);
+  --tag-send-color: var(--spring-green);
+  --tag-recv-bg: rgba(90,163,204,0.12);
+  --tag-recv-color: var(--sky-bright);
+  --tabbar-bg: rgba(255,255,255,0.92);
+  --tabbar-border: var(--border);
+  --ctrl-bg: var(--surface);
+  --input-bg: var(--surface-alt);
 
-  background: var(--gray6);
+  background: var(--bg);
   min-height: 100vh;
   padding: 0 0 120rpx 0;
 }
 
-/* ========== 内容区 ========== */
+/* ====================================================================
+   THEME:  HACKER (dark)
+   ================================================================ */
+.app.dark {
+  --bg: #0A0A0F;
+  --surface: #12121E;
+  --surface-alt: #1A1A2E;
+  --border: #1E1E35;
+  --label: #E0E0E0;
+  --secondary: #A0A0B0;
+  --tertiary: #606080;
+  --spring-green: #00FF41;
+  --spring-green-dim: #00CC33;
+  --spring-green-bright: #00FF41;
+  --sky: #00D4FF;
+  --sky-bright: #00B8E6;
+  --warm-orange: #FF9F1C;
+  --warm-coral: #FF6B6B;
+  --rose: #FF6BCB;
+  --gold: #FFD700;
+  --card-shadow: 0 0 16rpx rgba(0,255,65,0.08);
+  --radius-sm: 10rpx;
+  --radius: 14rpx;
+  --radius-lg: 20rpx;
+  --font-mono: 'SF Mono', 'Menlo', 'Courier New', monospace;
+  --tag-send-bg: rgba(0,255,65,0.1);
+  --tag-send-color: var(--spring-green);
+  --tag-recv-bg: rgba(0,212,255,0.1);
+  --tag-recv-color: var(--sky-bright);
+  --tabbar-bg: rgba(10,10,15,0.95);
+  --tabbar-border: var(--border);
+  --ctrl-bg: var(--surface);
+  --input-bg: var(--surface-alt);
+
+  background: var(--bg);
+}
+.app.dark .db-card,
+.app.dark .ctrl-btn,
+.app.dark .ctrl-group,
+.app.dark .hist-item {
+  border: 1rpx solid rgba(0,255,65,0.06);
+}
+
+/* ======================= SHARED ========================== */
+
 .tab-content {
   padding: 24rpx 20rpx;
 }
 
-/* ========== 仪表盘 ========== */
+.theme-toggle {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+/* ======================= DASHBOARD ========================== */
+
 .db-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 28rpx;
 }
+.db-header-right {
+  display: flex;
+  align-items: center;
+}
 .db-title-row {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 10rpx;
 }
 .db-title-label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: var(--tertiary);
-  margin-bottom: 2rpx;
 }
 .db-title {
-  font-size: 36rpx;
-  font-weight: 700;
+  font-size: 28rpx;
+  font-weight: 600;
   color: var(--label);
-  letter-spacing: -0.5rpx;
+  font-family: var(--font-mono);
+  letter-spacing: -0.3rpx;
 }
 .db-status {
   display: inline-flex;
@@ -760,39 +870,56 @@ createPage({
   border-radius: 30rpx;
 }
 .db-on {
-  background: rgba(52,199,89,0.12);
-  color: var(--green);
+  background: rgba(107,170,94,0.12);
+  color: var(--spring-green);
+}
+.app.dark .db-on {
+  background: rgba(0,255,65,0.08);
+  box-shadow: 0 0 8rpx rgba(0,255,65,0.15);
 }
 .db-off {
   background: rgba(142,142,147,0.12);
-  color: var(--gray);
+  color: var(--tertiary);
 }
 .db-dot {
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
 }
-.db-on .db-dot { background: var(--green); }
-.db-off .db-dot { background: var(--gray); }
+.db-on .db-dot { background: var(--spring-green); }
+.app.dark .db-on .db-dot { box-shadow: 0 0 6rpx var(--spring-green); }
+.db-off .db-dot { background: var(--tertiary); }
 
 .db-read-btn {
   width: 100%;
   height: 96rpx;
-  background: var(--blue);
-  border-radius: 14rpx;
+  background: linear-gradient(135deg, var(--spring-green) 0%, var(--sky-bright) 100%);
+  border-radius: var(--radius-lg);
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: #FFF;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 28rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,122,255,0.3);
+  box-shadow: 0 4rpx 20rpx rgba(79,154,66,0.3);
   border: none;
+  letter-spacing: 2rpx;
+}
+.app.dark .db-read-btn {
+  background: linear-gradient(135deg, #003300 0%, #001a33 100%);
+  border: 1rpx solid var(--spring-green);
+  box-shadow: 0 0 20rpx rgba(0,255,65,0.15), inset 0 0 20rpx rgba(0,255,65,0.03);
+  color: var(--spring-green);
+  font-family: var(--font-mono);
+  letter-spacing: 3rpx;
 }
 .db-read-btn:active {
   opacity: 0.85;
   transform: scale(0.98);
+}
+.app.dark .db-read-btn:active {
+  box-shadow: 0 0 30rpx rgba(0,255,65,0.25);
 }
 
 .db-cards {
@@ -801,9 +928,9 @@ createPage({
   gap: 12rpx;
 }
 .db-card {
-  background: #FFF;
+  background: var(--surface);
   border-radius: var(--radius);
-  padding: 20rpx 16rpx;
+  padding: 20rpx 12rpx;
   text-align: center;
   box-shadow: var(--card-shadow);
 }
@@ -814,13 +941,18 @@ createPage({
   display: block;
   margin-bottom: 4rpx;
 }
-.db-highlight {
-  color: var(--blue);
+.app.dark .db-card-val {
+  font-family: var(--font-mono);
 }
 .db-card-label {
   font-size: 20rpx;
   color: var(--tertiary);
   display: block;
+}
+.app.dark .db-card-label {
+  font-size: 18rpx;
+  letter-spacing: 1rpx;
+  text-transform: uppercase;
 }
 
 .db-placeholder {
@@ -829,29 +961,31 @@ createPage({
   align-items: center;
   padding: 80rpx 0;
 }
-.db-placeholder-icon {
-  font-size: 64rpx;
-  color: var(--gray4);
-  margin-bottom: 16rpx;
-}
 .db-placeholder-text {
   font-size: 26rpx;
-  color: var(--gray2);
+  color: var(--tertiary);
 }
 
-/* ========== 控制 ========== */
+/* ======================= CONTROL ========================== */
+
 .ctrl-section {
-  margin-bottom: 32rpx;
+  margin-bottom: 40rpx;
 }
 .ctrl-section-title {
   font-size: 22rpx;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--tertiary);
   text-transform: uppercase;
-  letter-spacing: 1rpx;
-  margin-bottom: 12rpx;
-  padding: 0 4rpx;
+  letter-spacing: 2rpx;
+  margin-bottom: 14rpx;
+  padding: 0 6rpx;
 }
+.app.dark .ctrl-section-title {
+  color: var(--spring-green-dim);
+  letter-spacing: 3rpx;
+  font-family: var(--font-mono);
+}
+
 .ctrl-quick {
   display: flex;
   gap: 12rpx;
@@ -862,117 +996,199 @@ createPage({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8rpx;
+  gap: 10rpx;
   padding: 28rpx 8rpx;
-  background: #FFF;
+  background: var(--ctrl-bg);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   border: none;
   transition: all 0.15s;
 }
 .ctrl-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
   opacity: 0.8;
 }
 .ctrl-btn-icon {
-  font-size: 36rpx;
+  font-size: 38rpx;
 }
 .ctrl-btn-label {
   font-size: 26rpx;
   font-weight: 600;
   color: var(--label);
 }
-.ctrl-open .ctrl-btn-icon { color: var(--green); }
-.ctrl-close .ctrl-btn-icon { color: var(--red); }
-.ctrl-reset .ctrl-btn-icon { color: var(--orange); }
+.ctrl-open .ctrl-btn-icon { color: var(--spring-green); }
+.ctrl-close .ctrl-btn-icon { color: var(--warm-coral); }
+.ctrl-reset .ctrl-btn-icon { color: var(--warm-orange); }
+
+/* ======================= PARAMETER FIELDS (card style) ========================== */
+.pf-field {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  padding: 28rpx;
+  margin-bottom: 28rpx;
+}
+.pf-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 8rpx; }
+.pf-label {
+  font-size: 26rpx; font-weight: 600; color: var(--label);
+  flex-shrink: 0; width: 140rpx;
+}
+.app.dark .pf-label { color: var(--secondary); }
+
+.pf-inp { display: flex; align-items: center; gap: 8rpx; flex: 1; min-width: 0; }
+.pf-input {
+  flex: 1; height: 80rpx;
+  background: var(--input-bg); border: none;
+  border-radius: var(--radius-sm);
+  padding: 0 16rpx; font-size: 28rpx; color: var(--label);
+  text-align: left; box-sizing: border-box; min-width: 0;
+}
+.app.dark .pf-input { border: 1rpx solid var(--border); font-family: var(--font-mono); }
+.pf-unit { font-size: 24rpx; color: var(--tertiary); flex-shrink: 0; width: 40rpx; text-align: center; }
+.pf-btn {
+  display: block; margin-left: auto; height: 60rpx; padding: 0 24rpx;
+  background: var(--spring-green); border: none;
+  border-radius: var(--radius-sm);
+  font-size: 24rpx; font-weight: 600; color: #FFF;
+}
+.app.dark .pf-btn {
+  background: transparent; border: 1rpx solid var(--spring-green);
+  color: var(--spring-green); font-family: var(--font-mono); letter-spacing: 1rpx;
+}
+.pf-btn:active { opacity: 0.75; transform: scale(0.96); }
+
+.pf-group-title {
+  font-size: 22rpx; font-weight: 700; color: var(--tertiary);
+  text-transform: uppercase; letter-spacing: 2rpx;
+  display: block; margin-bottom: 16rpx;
+}
+.app.dark .pf-group-title { color: var(--spring-green-dim); font-family: var(--font-mono); letter-spacing: 3rpx; }
 
 .ctrl-group {
-  background: #FFF;
+  background: var(--ctrl-bg);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   overflow: hidden;
 }
+
 .ctrl-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 20rpx 20rpx;
-  border-bottom: 0.5rpx solid var(--gray5);
+  border-bottom: 1rpx solid var(--border);
+  gap: 12rpx;
 }
 .ctrl-row:last-child { border-bottom: none; }
 .ctrl-label {
   font-size: 28rpx;
   color: var(--label);
   flex-shrink: 0;
-  margin-right: 16rpx;
-}
-.ctrl-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  flex: 1;
-  justify-content: flex-end;
+  min-width: 100rpx;
 }
 .ctrl-input {
-  height: 64rpx;
-  background: var(--gray6);
+  height: 72rpx;
+  background: var(--input-bg);
   border: none;
-  border-radius: 10rpx;
+  border-radius: var(--radius-sm);
   padding: 0 14rpx;
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: var(--label);
-  text-align: right;
-  width: 100rpx;
+  text-align: center;
+  width: 110rpx;
   box-sizing: border-box;
 }
-.ctrl-input-sm { width: 90rpx; }
-.ctrl-input-xs { width: 80rpx; }
+.app.dark .ctrl-input {
+  border: 1rpx solid var(--border);
+  font-family: var(--font-mono);
+}
+.ctrl-input-sm { width: 80rpx; }
+.ctrl-input-xs { width: 72rpx; }
 .ctrl-input-wide { width: 100%; text-align: left; }
 .ctrl-unit {
   font-size: 24rpx;
   color: var(--tertiary);
-  width: 40rpx;
+  min-width: 30rpx;
+  text-align: center;
 }
 .ctrl-picker {
   height: 64rpx;
-  background: var(--gray6);
-  border-radius: 10rpx;
+  background: var(--input-bg);
+  border-radius: var(--radius-sm);
   padding: 0 14rpx;
   font-size: 26rpx;
   color: var(--label);
   display: flex;
   align-items: center;
   min-width: 160rpx;
+  justify-content: center;
+}
+.app.dark .ctrl-picker {
+  border: 1rpx solid var(--border);
+  font-family: var(--font-mono);
+}
+.ctrl-addr {
+  height: 64rpx;
+  background: var(--input-bg);
+  border-radius: var(--radius-sm);
+  padding: 0 14rpx;
+  font-size: 26rpx;
+  color: var(--label);
+  font-family: var(--font-mono);
+  display: inline-flex;
+  align-items: center;
+  min-width: 160rpx;
+}
+.app.dark .ctrl-addr {
+  border: 1rpx solid var(--border);
 }
 .ctrl-set-btn {
-  height: 56rpx;
-  padding: 0 24rpx;
-  background: var(--blue);
+  height: 58rpx;
+  padding: 0 22rpx;
+  background: var(--spring-green);
   border: none;
-  border-radius: 10rpx;
+  border-radius: var(--radius-sm);
   font-size: 24rpx;
-  font-weight: 500;
+  font-weight: 600;
   color: #FFF;
   flex-shrink: 0;
+  min-width: 84rpx;
+  text-align: center;
+}
+.app.dark .ctrl-set-btn {
+  background: transparent;
+  border: 1rpx solid var(--spring-green);
+  color: var(--spring-green);
+  font-family: var(--font-mono);
+  letter-spacing: 1rpx;
 }
 .ctrl-set-btn:active {
-  opacity: 0.8;
+  opacity: 0.75;
+  transform: scale(0.96);
 }
 .ctrl-set-btn-secondary {
-  background: var(--gray6);
-  color: var(--blue);
+  background: var(--surface-alt);
+  color: var(--spring-green);
+}
+.app.dark .ctrl-set-btn-secondary {
+  border-color: var(--sky);
+  color: var(--sky);
 }
 .ctrl-set-btn-danger {
-  background: var(--gray6);
-  color: var(--red);
+  background: var(--surface-alt);
+  color: var(--warm-coral);
+}
+.app.dark .ctrl-set-btn-danger {
+  border-color: var(--warm-coral);
+  color: var(--warm-coral);
 }
 .ctrl-divider {
-  height: 0.5rpx;
-  background: var(--gray5);
+  height: 1rpx;
+  background: var(--border);
   margin: 0 20rpx;
 }
 
-/* ========== 历史 ========== */
+/* ======================= HISTORY ========================== */
+
 .hist-header {
   display: flex;
   align-items: center;
@@ -980,23 +1196,26 @@ createPage({
   margin-bottom: 20rpx;
 }
 .hist-title {
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: 700;
   color: var(--label);
 }
+.app.dark .hist-title {
+  font-family: var(--font-mono);
+}
 .hist-clear {
   font-size: 26rpx;
-  color: var(--blue);
+  color: var(--spring-green);
   padding: 8rpx;
 }
 .hist-empty {
   text-align: center;
   padding: 80rpx 0;
   font-size: 26rpx;
-  color: var(--gray2);
+  color: var(--tertiary);
 }
 .hist-item {
-  background: #FFF;
+  background: var(--surface);
   border-radius: var(--radius);
   padding: 16rpx 20rpx;
   margin-bottom: 10rpx;
@@ -1012,51 +1231,59 @@ createPage({
   font-size: 22rpx;
   color: var(--tertiary);
 }
+.app.dark .hist-time {
+  font-family: var(--font-mono);
+}
 .hist-tag {
   font-size: 18rpx;
-  font-weight: 500;
-  padding: 2rpx 12rpx;
+  font-weight: 600;
+  padding: 3rpx 14rpx;
   border-radius: 8rpx;
+  letter-spacing: 1rpx;
 }
 .hist-tag.send {
-  background: rgba(0,122,255,0.1);
-  color: var(--blue);
+  background: var(--tag-send-bg);
+  color: var(--tag-send-color);
 }
 .hist-tag.recv {
-  background: rgba(52,199,89,0.1);
-  color: var(--green);
+  background: var(--tag-recv-bg);
+  color: var(--tag-recv-color);
 }
 .hist-copy {
   margin-left: auto;
   font-size: 22rpx;
   color: var(--tertiary);
-  padding: 4rpx 12rpx;
-  border: 0.5rpx solid var(--gray4);
-  border-radius: 8rpx;
+  padding: 4rpx 14rpx;
+  border: 1rpx solid var(--border);
+  border-radius: var(--radius-sm);
 }
 .hist-hex {
   font-size: 20rpx;
   color: var(--secondary);
-  font-family: 'SF Mono', 'Menlo', monospace;
+  font-family: var(--font-mono);
   word-break: break-all;
   line-height: 1.4;
 }
 
-/* ========== 底部 Tab Bar ========== */
+/* ======================= TAB BAR ========================== */
+
 .tabbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   height: 100rpx;
-  background: rgba(255,255,255,0.92);
+  background: var(--tabbar-bg);
   backdrop-filter: blur(20rpx);
   -webkit-backdrop-filter: blur(20rpx);
-  border-top: 0.5rpx solid var(--gray4);
+  border-top: 1rpx solid var(--tabbar-border);
   display: flex;
   align-items: center;
   justify-content: space-around;
   padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.app.dark .tabbar {
+  border-top: 1rpx solid rgba(0,255,65,0.12);
 }
 .tabbar-item {
   display: flex;
@@ -1067,15 +1294,20 @@ createPage({
 }
 .tabbar-icon {
   font-size: 36rpx;
-  color: var(--gray);
+  color: var(--tertiary);
 }
 .tabbar-label {
   font-size: 18rpx;
-  color: var(--gray);
+  color: var(--tertiary);
+  font-weight: 500;
 }
 .tabbar-active .tabbar-icon,
 .tabbar-active .tabbar-label {
-  color: var(--blue);
+  color: var(--spring-green);
+}
+.app.dark .tabbar-active .tabbar-icon,
+.app.dark .tabbar-active .tabbar-label {
+  text-shadow: 0 0 8rpx rgba(0,255,65,0.4);
 }
 </style>
 

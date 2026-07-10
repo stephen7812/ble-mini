@@ -1,43 +1,69 @@
 <template>
-  <view class="page">
+  <view class="page {{darkMode ? 'dark' : ''}}">
+    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">连接设备</view>
+
     <view class="card">
-      <text class="text-sm font-bold mb-8">连接设备</text>
-      <view class="form-item">
-        <text class="form-label">设备编号（扫机身二维码）</text>
+      <view class="field-group">
+        <view class="field-label">设备编号</view>
         <view class="input-row">
-          <input class="form-input flex-1" model:value="{{deviceCode}}" placeholder="扫码或输入设备编号" />
-          <button class="btn-scan" bindtap="scanCode">扫码</button>
+          <input class="field-input" model:value="{{deviceCode}}" placeholder="扫码或输入设备编号" placeholder-class="field-placeholder" />
+          <button class="btn-primary btn-scan-icon" bindtap="scanCode">⊞</button>
         </view>
       </view>
-      <view class="form-item">
-        <text class="form-label">阀门类型</text>
-        <picker model:value="{{valveTypeIndex}}" range="{{valveTypes}}" bindchange="onValveTypeChange">
-          <view class="form-input">{{valveTypes[valveTypeIndex]}}</view>
-        </picker>
-      </view>
-      <button class="btn-primary" bindtap="goControl">进入控制</button>
-    </view>
 
-    <view class="header mt-16">
-      <text class="header-title">连接历史</text>
-      <button wx:if="{{pairedDevices.length > 0}}" class="btn-text" bindtap="clearHistory">清除</button>
-    </view>
-
-    <view wx:if="{{pairedDevices.length === 0}}" class="empty">
-      <text class="empty-icon">+</text>
-      <text class="empty-text">暂无连接记录</text>
-    </view>
-
-    <view wx:for="{{pairedDevices}}" wx:key="deviceId" class="card device-card" bindtap="goControlWithDevice" data-device="{{item}}">
-      <view class="flex-between">
-        <view>
-          <text class="device-name">{{item.localName || item.deviceId}}</text>
-          <text class="tag tag-success ml-8">{{item.valveType || '智能调节阀'}}</text>
+      <view class="field-group">
+        <view class="field-label">阀门类型</view>
+        <view class="sel-grid">
+          <view class="sel-option {{valveTypeIndex === 0 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="0">
+            <text class="sel-name">先导调节阀</text>
+            <text class="sel-desc">压力型</text>
+          </view>
+          <view class="sel-option {{valveTypeIndex === 1 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="1">
+            <text class="sel-name">智能调节阀</text>
+            <text class="sel-desc">开度型</text>
+          </view>
         </view>
-        <text class="tag {{item.connected ? 'tag-success' : 'tag-error'}}">{{item.connected ? '已连接' : '未连接'}}</text>
       </view>
-      <text class="text-sm text-secondary mt-8">{{item.lastSeenText}}</text>
+
+      <view class="field-group">
+        <view class="field-label">控制模式</view>
+        <view class="sel-grid">
+          <view class="sel-option {{modeIndex === 0 ? 'sel-active' : ''}}" bindtap="setMode" data-index="0">
+            <text class="sel-name">蓝牙广播</text>
+            <text class="sel-desc">通过 BLE 广播信号控制</text>
+          </view>
+          <view class="sel-option {{modeIndex === 1 ? 'sel-active' : ''}}" bindtap="setMode" data-index="1">
+            <text class="sel-name">4G/WiFi</text>
+            <text class="sel-desc">通过网络远程控制</text>
+          </view>
+        </view>
+      </view>
+
+      <button class="btn-primary btn-block" style="margin-top:24rpx" bindtap="goControl">确定</button>
     </view>
+
+    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">
+      <text>连接记录</text>
+      <text class="text-sm text-secondary" wx:if="{{pairedDevices.length > 0}}" bindtap="clearHistory" style="padding:8rpx 16rpx">清除</text>
+    </view>
+
+    <view wx:if="{{pairedDevices.length === 0}}" class="history-empty">暂无连接记录</view>
+
+    <block wx:for="{{pairedDevices}}" wx:key="deviceId">
+      <view class="card history-item" bindtap="goControlWithDevice" data-device="{{item}}">
+        <view class="history-dot {{item.connected ? 'dot-on' : 'dot-off'}}"></view>
+        <view class="history-info">
+          <view class="history-top">
+            <text class="history-name">{{item.localName || item.deviceId}}</text>
+            <text class="history-tag">{{item.valveType || '智能调节阀'}}</text>
+          </view>
+          <text class="history-time">{{item.lastSeenText}}</text>
+        </view>
+        <text class="text-sm {{item.connected ? 'text-success' : 'text-secondary'}}">{{item.connected ? '已连接' : '未连接'}}</text>
+      </view>
+    </block>
+
+    <view class="theme-toggle" bindtap="toggleTheme">{{darkMode ? '🌙' : '☀️'}}</view>
   </view>
 </template>
 
@@ -48,20 +74,26 @@ import { formatTimeDiff } from '../../utils/convert'
 
 const valveTypes = ['先导调节阀（压力型）', '智能调节阀（开度型）']
 const valveTypeIds = ['new', 'old']
+const modes = ['蓝牙广播', '4G/WiFi']
+const modeIds = ['broadcast', 'bluetooth']
 
 createPage({
-  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 0, valveTypes },
+  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 1, valveTypes, modeIndex: 0, modes, darkMode: false },
   onShow() {
+    const store = useDeviceStore()
+    this.setData({ darkMode: store.darkMode })
     this.formatDevices()
+  },
+  toggleTheme() {
+    const store = useDeviceStore()
+    store.toggleDarkMode()
+    this.setData({ darkMode: store.darkMode })
   },
   formatDevices() {
     const store = useDeviceStore()
     this.setData({
-      pairedDevices: (store.pairedDevices || []).map(d => ({ ...d, lastSeenText: formatTimeDiff(d.lastSeen) })),
+      pairedDevices: (store.pairedDevices || []).slice(0, 5).map(d => ({ ...d, lastSeenText: formatTimeDiff(d.lastSeen) })),
     })
-  },
-  onValveTypeChange(e) {
-    this.setData({ valveTypeIndex: e.detail.value })
   },
   scanCode() {
     const that = this
@@ -78,18 +110,22 @@ createPage({
     const code = this.data.deviceCode.trim()
     if (!code) { wx.showToast({ title: '请扫码或输入设备编号', icon: 'none' }); return }
     const idx = this.data.valveTypeIndex
+    const mode = modeIds[this.data.modeIndex]
     const device = {
       deviceId: code, localName: code,
       valveType: valveTypes[idx], valveTypeId: valveTypeIds[idx],
+      mode,
     }
     useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/control/index' })
+    wx.navigateTo({ url: '/pages/broadcast/index' })
   },
   goControlWithDevice(e) {
     const device = e.currentTarget.dataset.device
     useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/control/index' })
+    wx.navigateTo({ url: '/pages/broadcast/index' })
   },
+  setValveType(e) { this.setData({ valveTypeIndex: Number(e.currentTarget.dataset.index) }) },
+  setMode(e) { this.setData({ modeIndex: Number(e.currentTarget.dataset.index) }) },
   clearHistory() {
     wx.showModal({
       title: '确认清除', content: '确定清除所有连接记录？',
@@ -100,23 +136,67 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 16rpx; }
-.header { display: flex; justify-content: space-between; align-items: center; padding: 16rpx; }
-.header-title { font-size: 36rpx; font-weight: 600; }
-.empty { display: flex; flex-direction: column; align-items: center; margin-top: 100rpx; }
-.empty-icon { font-size: 60rpx; margin-bottom: 8rpx; }
-.empty-text { font-size: 28rpx; color: var(--color-text-secondary); }
-.device-card { margin: 16rpx; }
-.device-name { font-size: 30rpx; font-weight: 500; }
-.btn-text { background: transparent; border: none; color: var(--color-danger); font-size: 28rpx; padding: 0; }
-.form-item { margin-bottom: 24rpx; }
-.form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
-.form-input { width: 100%; height: 72rpx; border: 2rpx solid var(--color-border); border-radius: var(--radius); padding: 0 16rpx; font-size: 26rpx; box-sizing: border-box; }
-.input-row { display: flex; gap: 16rpx; }
-.input-row .form-input { width: auto; }
-.flex-1 { flex: 1; }
-.btn-scan { flex-shrink: 0; background: var(--color-primary); color: #fff; border-radius: var(--radius); padding: 0 24rpx; font-size: 26rpx; height: 72rpx; line-height: 72rpx; }
-.btn-scan:active { opacity: 0.8; }
+.page { padding: 16rpx; min-height: 100vh; position: relative; }
+
+.section-title {
+  font-size: 28rpx; font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.page.dark .section-title { color: var(--color-text-secondary); }
+
+.field-group { margin-bottom: 24rpx; }
+.field-group:last-of-type { margin-bottom: 0; }
+.field-label {
+  font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
+  margin-bottom: 8rpx;
+}
+.input-row { display: flex; gap: 12rpx; }
+.field-input {
+  flex: 1; height: 72rpx;
+  border: 2rpx solid var(--color-border); border-radius: var(--radius);
+  padding: 0 16rpx; font-size: 26rpx; color: var(--color-text); box-sizing: border-box;
+}
+.field-placeholder { color: #ccc; font-size: 24rpx; }
+.btn-scan-icon { width: 72rpx; height: 72rpx; padding: 0; font-size: 32rpx; flex-shrink: 0; line-height: 72rpx; }
+
+.sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
+.sel-option {
+  display: flex; flex-direction: column; align-items: center; gap: 6rpx;
+  padding: 20rpx 12rpx;
+  border: 2rpx solid var(--color-border); border-radius: var(--radius);
+  background: transparent; text-align: center;
+}
+.sel-option:active { background: var(--color-bg); }
+.sel-active { border-color: var(--color-primary); background: #e8faf0; }
+.page.dark .sel-active { background: rgba(0,255,65,0.08); }
+.sel-name { font-size: 26rpx; font-weight: 600; color: var(--color-text); }
+.sel-desc { font-size: 20rpx; color: var(--color-text-secondary); }
+
+.btn-block { width: 100%; box-sizing: border-box; }
+
+.history-empty {
+  text-align: center; padding: 64rpx 0; font-size: 26rpx; color: var(--color-text-secondary);
+}
+.history-item {
+  display: flex; align-items: center; gap: 14rpx;
+  margin: 0 0 12rpx 0; padding: 20rpx;
+}
+.history-item:active { background: var(--color-bg); }
+.history-dot { width: 10rpx; height: 10rpx; border-radius: 50%; flex-shrink: 0; }
+.dot-on { background: var(--color-success); }
+.dot-off { background: #ddd; }
+.history-info { flex: 1; min-width: 0; }
+.history-top { display: flex; align-items: center; gap: 8rpx; }
+.history-name { font-size: 28rpx; font-weight: 600; color: var(--color-text); }
+.history-tag { font-size: 20rpx; color: var(--color-primary); background: var(--color-bg); padding: 2rpx 10rpx; border-radius: 6rpx; }
+.history-time { font-size: 22rpx; color: var(--color-text-secondary); margin-top: 4rpx; display: block; }
+
+.theme-toggle {
+  position: absolute; top: 24rpx; right: 24rpx; z-index: 10;
+  width: 64rpx; height: 64rpx; border-radius: 50%;
+  background: var(--color-card); box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
+  display: flex; align-items: center; justify-content: center; font-size: 32rpx;
+}
 </style>
 
 <script type="application/json">

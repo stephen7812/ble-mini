@@ -1,7 +1,3 @@
-const SERVICE_UUID = ''
-const WRITE_CHAR_UUID = ''
-const NOTIFY_CHAR_UUID = ''
-
 let deviceId = ''
 let serviceId = ''
 let writeCharId = ''
@@ -23,7 +19,7 @@ function discoverServices() {
     wx.getBLEDeviceServices({
       deviceId,
       success(res) {
-        const svc = res.services.find(s => s.uuid.includes(SERVICE_UUID)) || res.services[0]
+        const svc = res.services.find(s => s.uuid.includes('ffe0') || s.uuid.includes('fff0')) || res.services[0]
         serviceId = svc.uuid
         discoverCharacteristics().then(resolve).catch(reject)
       },
@@ -37,8 +33,8 @@ function discoverCharacteristics() {
     wx.getBLEDeviceCharacteristics({
       deviceId, serviceId,
       success(res) {
-        const writeChar = res.characteristics.find(c => c.uuid.includes(WRITE_CHAR_UUID) || (c.properties & 0x04))
-        const notifyChar = res.characteristics.find(c => c.uuid.includes(NOTIFY_CHAR_UUID) || (c.properties & 0x10))
+        const writeChar = res.characteristics.find(c => (c.properties & 0x08) || (c.properties & 0x04))
+        const notifyChar = res.characteristics.find(c => (c.properties & 0x10) || (c.properties & 0x20))
         if (!writeChar) { reject(new Error('未找到可写的特征值')); return }
         writeCharId = writeChar.uuid
         notifyCharId = notifyChar?.uuid || ''
@@ -81,7 +77,6 @@ export function readDeviceInfo() {
   return new Promise((resolve) => {
     const result = { label: '设备信息' }
     let pending = DIS_CHARS.length
-    if (!pending) { resolve(result); return }
     DIS_CHARS.forEach(({ uuid, name }) => {
       wx.readBLECharacteristicValue({
         deviceId, characteristicId: uuid, serviceId: DIS_SERVICE,

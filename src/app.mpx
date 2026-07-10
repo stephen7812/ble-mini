@@ -6,22 +6,24 @@ import { useDeviceStore } from './stores/device'
 createApp({
   onLaunch() {
     createPinia()
-    useDeviceStore().loadHistory()
+    const store = useDeviceStore()
+    store.loadDevices()
+    store.loadDarkMode()
   },
 })
 </script>
 
 <style>
 page {
-  --color-primary: #1677ff;
+  --color-primary: #00b578;
   --color-success: #00b578;
   --color-warning: #ff8f1f;
   --color-danger: #ff3141;
-  --color-bg: #f5f5f5;
+  --color-bg: #f5f7f0;
   --color-card: #ffffff;
-  --color-text: #333333;
-  --color-text-secondary: #999999;
-  --color-border: #eeeeee;
+  --color-text: #2d3a2d;
+  --color-text-secondary: #8a9a8a;
+  --color-border: #dce3d4;
   --radius: 12rpx;
   background: var(--color-bg);
   font-size: 28rpx;
@@ -65,6 +67,50 @@ page {
 .tag-success { background: #e8faf0; color: #00b578; }
 .tag-warning { background: #fff3e8; color: #ff8f1f; }
 .tag-error { background: #ffeeed; color: #ff3141; }
+
+/* ----- 深色主题 · 黑客风格 ----- */
+.page.dark {
+  --color-primary: #2ecc71;
+  --color-success: #2ecc71;
+  --color-warning: #FF9F1C;
+  --color-danger: #FF6B6B;
+  --color-bg: #0A0A0F;
+  --color-card: #12121E;
+  --color-text: #E0E0E0;
+  --color-text-secondary: #808099;
+  --color-border: #1E1E35;
+}
+.page.dark { background: var(--color-bg); }
+.page.dark .card { background: var(--color-card); border: 1rpx solid rgba(0,255,65,0.06); }
+.page.dark .btn-primary { background: var(--color-primary); color: #fff; font-weight: 700; }
+.page.dark .btn-outline { border-color: var(--color-primary); color: var(--color-primary); }
+.page.dark .field-input { background: #1a1a2e; border-color: var(--color-primary); color: var(--color-text); }
+.page.dark .sel-option { background: #1a1a2e; border-color: #2a2a44; }
+.page.dark .sel-active { background: rgba(0,255,65,0.08); border-color: var(--color-primary); }
+.page.dark .history-item { background: var(--color-card); }
+.page.dark .history-item:active { background: #1a1a2e; }
+.page.dark .history-tag { background: rgba(0,255,65,0.1); color: var(--color-primary); }
+.page.dark .btn-cmd { border-color: #2a2a44; }
+.page.dark .btn-cmd:active { background: #1a1a2e; }
+.page.dark .btn-send { border-color: var(--color-primary); }
+.page.dark .btn-send:active { background: rgba(0,255,65,0.08); }
+.page.dark .status-tag.on { background: rgba(0,255,65,0.1); color: var(--color-primary); }
+.page.dark .status-tag.off { background: #1a1a2e; color: var(--color-text-secondary); }
+.page.dark .data-item { background: #1a1a2e; }
+.page.dark .log-item { border-color: #1E1E35; }
+.page.dark .param-input,
+.page.dark .param-input-sm { background: #1a1a2e; border-color: var(--color-primary); color: var(--color-text); }
+.page.dark .log-hex,
+.page.dark .cmd-hex { color: #606080; }
+.page.dark .btn-cmd-full { background: rgba(0,255,65,0.06); border-color: var(--color-primary); }
+.page.dark .btn-cmd-close { background: rgba(255,107,107,0.06); border-color: var(--color-danger); }
+.page.dark .btn-cmd-primary { border-color: var(--color-primary); }
+.page.dark .btn-cmd-primary .cmd-name { color: var(--color-primary); }
+.page.dark .tag-success { background: rgba(0,255,65,0.1); color: var(--color-primary); }
+.page.dark .tag-warning { background: rgba(255,159,28,0.1); color: var(--color-warning); }
+.page.dark .tag-error { background: rgba(255,107,107,0.1); color: var(--color-danger); }
+.page.dark .text-success { color: var(--color-primary); }
+.page.dark .section-title { color: var(--color-text-secondary); }
 </style>
 
 <script type="application/json">
@@ -73,7 +119,8 @@ page {
     "./pages/index/index",
     "./pages/scan/index",
     "./pages/control/index",
-    "./pages/device-info/index"
+    "./pages/device-info/index",
+    "./pages/broadcast/index"
   ],
   "window": {
     "navigationBarTitleText": "正丰智能阀门",
