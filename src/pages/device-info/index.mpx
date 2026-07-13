@@ -3,8 +3,8 @@
     <view wx:if="{{valveTypeId === 'new'}}" class="card">
       <text class="text-sm font-bold mb-8">压力设置</text>
       <view class="form-item">
-        <text class="form-label">目标压力 (MPa)</text>
-        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0.0 ~ 2.5" />
+        <text class="form-label">目标压力 (KPa)</text>
+        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0 ~ 2500" />
       </view>
       <button class="btn-primary" bindtap="setPressure">设置压力</button>
 
@@ -47,11 +47,11 @@ import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
 import { write } from '../../services/ble/connector'
 import { getProtocol } from '../../services/protocol/factory'
-import { pressureMPaTo10KPa } from '../../utils/convert'
+import { pressureKPaTo10KPa } from '../../utils/convert'
 
 createPage({
   data: {
-    valveTypeId: 'old', targetPressure: '0.2', inletComp: '0',
+    valveTypeId: 'old', targetPressure: '200', inletComp: '0',
     targetOpening: 50, workModeIndex: 1,
     workModes: ['通断阀', '回水调节', '室内调节', '流量平衡', '停止'],
   },
@@ -63,9 +63,9 @@ createPage({
     this.cmds = this.protocol.commands
   },
   setPressure() {
-    const mpa = parseFloat(this.data.targetPressure)
-    if (isNaN(mpa) || mpa < 0 || mpa > 2.5) { wx.showToast({ title: '无效压力值', icon: 'none' }); return }
-    this.sendFrame(this.cmds.setTargetPressure(pressureMPaTo10KPa(mpa)), '设置成功')
+    const kpa = parseFloat(this.data.targetPressure)
+    if (isNaN(kpa) || kpa < 0 || kpa > 2500) { wx.showToast({ title: '无效压力值', icon: 'none' }); return }
+    this.sendFrame(this.cmds.setTargetPressure(pressureKPaTo10KPa(kpa)), '设置成功')
   },
   setPressureComp() {
     if (!this.cmds.setPressureCompensation) return

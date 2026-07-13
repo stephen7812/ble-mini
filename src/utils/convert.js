@@ -2,6 +2,10 @@ export function pressureMPaTo10KPa(mpa) {
   return Math.round(mpa * 100)
 }
 
+export function pressureKPaTo10KPa(kpa) {
+  return Math.round(kpa / 10)
+}
+
 export function voltageMvToV(mv) {
   return (mv / 1000).toFixed(1)
 }
