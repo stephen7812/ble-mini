@@ -40,11 +40,16 @@ export const useDeviceStore = defineStore('device', {
       wx.setStorageSync('pairedDevices', this.pairedDevices)
     },
     addDevice(device) {
-      const exists = this.pairedDevices.find(d => d.deviceId === device.deviceId)
-      if (!exists) {
+      const idx = this.pairedDevices.findIndex(d => d.deviceId === device.deviceId)
+      if (idx >= 0) {
+        // 已有记录：合并最新信息、刷新时间并置顶，作为「最近使用」
+        const merged = { ...this.pairedDevices[idx], ...device, lastSeen: Date.now() }
+        this.pairedDevices.splice(idx, 1)
+        this.pairedDevices.unshift(merged)
+      } else {
         this.pairedDevices.unshift({ ...device, lastSeen: Date.now() })
-        this.saveHistory()
       }
+      this.saveHistory()
     },
     removeDevice(deviceId) {
       this.pairedDevices = this.pairedDevices.filter(d => d.deviceId !== deviceId)

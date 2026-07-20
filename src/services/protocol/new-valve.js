@@ -1,13 +1,19 @@
 export const NEW_VALVE = { type: '先导调节阀', typeId: 'new' }
 
-// 16字节定长帧：帧头(1) + 数据域(15)，不足补0xFF
+// 帧格式与智能调节阀一致：byte1 高4位=子命令码S，低4位=通讯序号O(上位机顺序递增)。
+// 设备靠序号区分「新指令」与「重复广播」；子命令必须落在高4位，否则设备识别为 0 号命令。
+let _seq = 2
+function nextSeq() { const s = _seq; _seq = (_seq + 1) & 0x0F; return s }
+export function resetSeq() { _seq = 2 }
+
+// 16字节定长帧：帧头(1) + 子命令/序号(1) + 数据域(不足补0xFF)
 export function buildFrame(cmd, subCmd, data = []) {
   const length = (data?.length || 0) + 1
   const header = ((cmd & 0x0F) << 4) | (length & 0x0F)
   const buf = new Uint8Array(16)
   buf.fill(0xFF)
   buf[0] = header
-  buf[1] = subCmd
+  buf[1] = ((subCmd & 0x0F) << 4) | nextSeq()
   if (data?.length) buf.set(data, 2)
   return buf.buffer
 }
@@ -39,17 +45,16 @@ function parsePage1Response(data) {
     setPressure: data[2] * 10,
     inletCompensation: toInt8(data[3]),
     returnCompensation: toInt8(data[4]),
-    pressureUpper: data[5] * 10,
-    pressureLower: data[6] * 10,
+    returnPressureUpper: data[5] * 10,
+    returnPressureLower: data[6] * 10,
     status: data[7],
     funcBits: data[8],
-    moduleFuncBits: data[9],
-    valvePosition: data[10],
-    targetPosition: data[11],
-    positionUpper: data[12],
-    positionLower: data[13],
-    sampleCycle: data[14] * 10,
-    reportCycle: data.length > 15 ? data[15] * 10 : undefined,
+    valvePosition: data[9],
+    targetPosition: data[10],
+    positionUpper: data[11],
+    positionLower: data[12],
+    sampleCycle: data[13] * 10,
+    reportCycle: data[14] * 10,
   }
 }
 

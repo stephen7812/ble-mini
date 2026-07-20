@@ -26,7 +26,7 @@
       </button>
 
       <view wx:if="{{deviceStatus.length > 0}}" class="db-cards">
-        <view wx:for="{{deviceStatus}}" wx:key="key" class="db-card">
+        <view wx:for="{{deviceStatus}}" wx:key="key" class="db-card {{item.full ? 'full' : ''}}">
           <text class="db-card-val {{item.highlight ? 'db-highlight' : ''}}">{{item.value}}</text>
           <text class="db-card-label">{{item.label}}</text>
         </view>
@@ -175,7 +175,7 @@
         <view class="ctrl-group">
           <view class="ctrl-row">
             <text class="ctrl-label">设备地址</text>
-            <view class="ctrl-addr">{{configAddress}}</view>
+            <input class="ctrl-addr" type="text" placeholder="设备编号后6位" model:value="{{configAddress}}" bindblur="onAddressBlur" />
           </view>
           <view class="ctrl-divider"></view>
           <view class="ctrl-row">
@@ -234,7 +234,7 @@ import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
 import { getProtocol } from '../../services/protocol/factory'
 import { resetSeq } from '../../services/protocol/old-valve'
-import { generateData } from '../../services/beacon/bleUtil'
+import { generateDataWithAddr } from '../../services/beacon/bleUtil'
 
 const FILTER_NAME = 'ANTS'
 const MANUFACTURER_ID = '0x00C7'
@@ -281,6 +281,71 @@ const PAGE1_LAYOUT = [
     parse: parseTemperature },
 ]
 
+// ===== 先导阀(压力阀)响应解析 =====
+// hex 字符串按字节切片：帧头=byte0=chars[0:2]，data[k]=chars[2+2k:4+2k]
+function u8(v) { return parseInt(v, 16) || 0 }
+function s8(v) { const n = parseInt(v, 16) || 0; return n > 127 ? n - 256 : n }
+function kpa10(v) { return `${u8(v) * 10} KPa` }        // 单位10KPa
+function kpaS8(v) { return `${s8(v)} KPa` }             // INT8 补偿
+function min10(v) { return `${u8(v) * 10} 分钟` }       // 单位10分钟
+function slot(v) {                                      // 4 hex：时(1B)+压(1B)
+  const t = u8(v.slice(0, 2))
+  return t === 255 ? '未启用' : `${t * 10}分钟 · ${u8(v.slice(2, 4)) * 10}KPa`
+}
+
+// 状态/功能位语义化：BLE 单字节只承载 V902ZF 状态字的低8位(BIT0~7)，高8位(电池欠压/SIM/4G/网络等)仅物联网上报
+// 设备状态位定义表：置位=故障(0正常/1故障)
+const VALVE_STATUS_BITS = ['阀门堵转', '阀门空转', '电位器故障', '霍尔传感器故障', '进水压力传感器故障', '出水压力传感器故障', '压差异常', '出水压力调节异常']
+// 功能模块使能位定义表：置位=使能(0禁止/1使能)
+const VALVE_FUNC_BITS = ['LCD显示', '拆除报警', '', '', '', '压力上限报警', '压力下限报警', '压力变化阈值报警']
+function bitsOn(hex, names) {
+  const v = u8(hex)
+  const on = []
+  for (let i = 0; i < 8; i++) if ((v >> i) & 1) on.push(names[i] || `预留位${i}`)
+  return on
+}
+function valveStatus(v) {                               // 无故障=正常，否则逐项列出故障
+  const on = bitsOn(v, VALVE_STATUS_BITS)
+  return on.length ? on.join('、') : '正常'
+}
+function valveFunc(v) {                                  // 列出已使能的功能，无则显示「无」
+  const on = bitsOn(v, VALVE_FUNC_BITS)
+  return on.length ? on.join('、') : '无'
+}
+
+// 查询第一页 回复 0x3F（15 字节数据域）
+const PAGE1_LAYOUT_NEW = [
+  { key: 'inletPressure', label: '进水压力', start: 2, end: 4, parse: kpa10 },
+  { key: 'returnPressure', label: '回水压力', start: 4, end: 6, parse: kpa10 },
+  { key: 'setPressure', label: '设定压力', start: 6, end: 8, parse: kpa10 },
+  { key: 'inletComp', label: '进水压力补偿', start: 8, end: 10, parse: kpaS8 },
+  { key: 'returnComp', label: '回水压力补偿', start: 10, end: 12, parse: kpaS8 },
+  { key: 'returnUpper', label: '回水压力上限', start: 12, end: 14, parse: kpa10 },
+  { key: 'returnLower', label: '回水压力下限', start: 14, end: 16, parse: kpa10 },
+  { key: 'status', label: '状态', start: 16, end: 18, parse: valveStatus },
+  { key: 'funcBits', label: '功能位', start: 18, end: 20, parse: valveFunc },
+  { key: 'valvePosition', label: '阀门圈数', start: 20, end: 22, parse: v => `${u8(v)}` },
+  { key: 'targetPosition', label: '设定圈数', start: 22, end: 24, parse: v => `${u8(v)}` },
+  { key: 'posUpper', label: '圈数上限', start: 24, end: 26, parse: v => `${u8(v)}` },
+  { key: 'posLower', label: '圈数下限', start: 26, end: 28, parse: v => `${u8(v)}` },
+  { key: 'sampleCycle', label: '采样周期', start: 28, end: 30, parse: min10 },
+  { key: 'reportCycle', label: '上报周期(供暖期)', start: 30, end: 32, parse: min10 },
+]
+
+// 查询第二页 回复 0x4F（15 字节数据域）
+const PAGE2_LAYOUT_NEW = [
+  { key: 'timeEnable', label: '分时压力', start: 2, end: 4, parse: v => u8(v) === 1 ? '使能' : '禁止' },
+  { key: 'slot1', label: '分时1', start: 4, end: 8, parse: slot },
+  { key: 'slot2', label: '分时2', start: 8, end: 12, parse: slot },
+  { key: 'slot3', label: '分时3', start: 12, end: 16, parse: slot },
+  { key: 'slot4', label: '分时4', start: 16, end: 20, parse: slot },
+  { key: 'slot5', label: '分时5', start: 20, end: 24, parse: slot },
+  { key: 'inletThreshold', label: '进水压力阈值', start: 24, end: 26, parse: kpa10 },
+  { key: 'returnThreshold', label: '回水压力阈值', start: 26, end: 28, parse: kpa10 },
+  { key: 'battery', label: '电池电压', start: 28, end: 30, parse: v => `${((u8(v) + 300) / 100).toFixed(2)} V` },
+  { key: 'signal', label: '信号值', start: 30, end: 32, parse: v => `${u8(v)}` },
+]
+
 function ab2hex(buffer) {
   const u8 = new Uint8Array(buffer)
   return Array.from(u8).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('')
@@ -289,6 +354,20 @@ function ab2hex(buffer) {
 function toHex(arr) {
   if (arr instanceof ArrayBuffer) arr = new Uint8Array(arr)
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// 设备广播地址 = 设备编号后 6 位 hex。优先从广播名(P-/V5-/BA- 等前缀)提取，
+// 提取不到再回退到上次手动输入(storage)。deviceId 在 iOS 是随机 UUID，不能当地址用。
+function extractAddr(name) {
+  if (!name) return ''
+  let s = String(name).trim()
+  const prefixes = ['P-', 'P_', 'V5-', 'BA-', 'BLACKANT']
+  const upper = s.toUpperCase()
+  for (const p of prefixes) {
+    if (upper.startsWith(p)) { s = s.slice(p.length); break }
+  }
+  s = s.replace(/[^0-9a-fA-F]/g, '')
+  return s.length >= 6 ? s.slice(-6).toLowerCase() : ''
 }
 
 function fmtTime() {
@@ -321,18 +400,33 @@ createPage({
     const device = store.currentDevice
     if (!device) { wx.navigateBack(); return }
     const id = device.deviceId || ''
+    // 广播地址取设备编号后 6 位：优先从广播名前缀提取，取不到再用上次手动输入(storage)。
+    // deviceId 在 iOS 是随机 UUID，不能当地址用。
+    const nameAddr = extractAddr(device.localName || device.name || device.deviceName || '')
+    const savedAddr = (wx.getStorageSync('address') || '').replace(/\s+/g, '').toLowerCase()
+    const savedChannel = wx.getStorageSync('channel') || '37'
     this.setData({
       darkMode: store.darkMode,
       deviceName: id,
       deviceType: device.valveType || '',
       deviceId: id,
       deviceIdShort: id.slice(-6),
-      configAddress: id.slice(-6),
+      configAddress: nameAddr || savedAddr,
       mode: device.valveTypeId || 'old',
-      configChannel: 0,
+      configChannel: Math.max(0, channels.indexOf(savedChannel)),
     })
     this.protocol = getProtocol(this.data.mode)
     this.cmds = this.protocol.commands
+    // 广播模式也记入「连接记录」，下次可从首页历史直接进入、无需重新扫描
+    if (id) {
+      store.addDevice({
+        deviceId: id,
+        localName: device.localName || device.name || device.deviceName || '',
+        valveType: device.valveType || '',
+        valveTypeId: device.valveTypeId || 'old',
+        mode: 'broadcast',
+      })
+    }
     this.loadLogs()
     this.initBluetooth()
   },
@@ -429,7 +523,7 @@ createPage({
                 return
               }
             } else if (!page2Done) {
-              if (hex.slice(0, 2) === '3E') {
+              if (hex.slice(0, 2) === '4F') {
                 this.clearTimer()
                 this.setData({
                   'readStatus.page2Done': true,
@@ -456,9 +550,13 @@ createPage({
     }
     if (this.data.readStatus.isReading) return
     this._readRetries = 0
+    this._page1Hex = null
+    this._page2Hex = null
+    // 先导阀参数分两页(0x3F/0x4F)，电池/信号/阈值/分时压力在第二页 → 读全部
+    const readMode = this.data.mode === 'new' ? 'full' : 'single'
     this.setData({
       cmdLoading: true,
-      readMode: 'single',
+      readMode,
       readStatus: { isReading: true, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null }
     })
     this.updateStatus('正在读取状态...', 'status-processing')
@@ -480,6 +578,7 @@ createPage({
     })
   },
   startPage2() {
+    this._readRetries2 = 0
     this.updateStatus('正在读取第二页...', 'status-processing')
     this.loopPage2()
   },
@@ -488,9 +587,14 @@ createPage({
     this.loopPage2Cmd()
   },
   loopPage2Cmd() {
-    const seq = this.getSeq()
-    const cmd = '312A' + seq
-    this.sendRaw(cmd.padEnd(32, 'f'), () => {
+    // 第二页超时：第一页已成功，按部分完成收尾（保留第一页数据）
+    if (this._readRetries2 >= MAX_RETRIES) {
+      this.finishRead()
+      this.updateStatus('第二页无响应，仅显示第一页', 'status-success')
+      return
+    }
+    this._readRetries2++
+    this.sendCmd('queryPage2', () => {
       this.setData({
         'readStatus.timer': setTimeout(() => this.loopPage2Cmd(), RESEND_DELAY)
       })
@@ -506,7 +610,13 @@ createPage({
   sendRaw(hex, callback) {
     this.stopAdvertising()
     this.logCmd(hex)
-    const actPayload = generateData(hex)
+    const addr = (this.data.configAddress || '').replace(/\s+/g, '').toLowerCase()
+    if (addr.length < 6 || addr.length > 10) {
+      wx.showToast({ icon: 'none', title: '请先填写设备地址(编号后6位)' })
+      callback && callback(); return
+    }
+    wx.setStorageSync('address', addr)
+    const actPayload = generateDataWithAddr(addr, hex)
     if (!actPayload) { callback && callback(); return }
     const buf = new ArrayBuffer(actPayload.length)
     const view = new Uint8Array(buf)
@@ -542,42 +652,65 @@ createPage({
     this._seq = (this._seq || 0) + 1
     return c
   },
-  doParse(hex) {
-    const p1 = hex || this.data.readStatus.page1Data
-    if (!p1) return
-    const status1 = PAGE1_LAYOUT.filter(i => i.parse).map(i => ({
-      key: i.key, label: i.label, value: i.parse(p1.slice(i.start, i.end))
-    }))
-    const rawMode = parseInt(p1.slice(2, 4), 16)
-    const modeIdx = workModeCodes.indexOf(rawMode)
-    const sync = {
-      p_opening: parseInt(p1.slice(6, 8), 16) || 0,
-      p_limitU: parseInt(p1.slice(8, 10), 16) || 100,
-      p_limitL: parseInt(p1.slice(10, 12), 16) || 0,
-      p_spMin: parseInt(p1.slice(12, 14), 16) * 10 || 30,
-      p_rpOnMin: parseInt(p1.slice(14, 16), 16) * 10 || 30,
-      p_rpOffDay: parseInt(p1.slice(16, 18), 16) || 3,
-      p_modeIdx: modeIdx >= 0 ? modeIdx : 0,
+  // 按当前设备协议渲染已收到的页数据（先导阀=新协议，可合并第一/第二页）
+  renderStatus(rssi) {
+    const isNew = this.data.mode === 'new'
+    const p1 = this._page1Hex
+    const p2 = this._page2Hex
+    const rows = []
+    if (p1) {
+      const layout = isNew ? PAGE1_LAYOUT_NEW : PAGE1_LAYOUT
+      layout.forEach(i => {
+        if (!i.parse) return
+        const value = i.parse(p1.slice(i.start, i.end))
+        const row = { key: i.key, label: i.label, value }
+        if (i.key === 'status') row.highlight = value !== '正常'   // 有故障标红
+        if ((i.key === 'status' || i.key === 'funcBits') && value.length > 6) row.full = true  // 太长单独整行
+        rows.push(row)
+      })
     }
-    this.setData({
-      deviceStatus: status1,
-      updateTime: new Date().toLocaleString(),
-      ...sync
-    })
+    if (isNew && p2) {
+      PAGE2_LAYOUT_NEW.forEach(i => {
+        if (i.parse) rows.push({ key: i.key, label: i.label, value: i.parse(p2.slice(i.start, i.end)) })
+      })
+    }
+    if (!rows.length) {
+      rows.push({ key: 'rssi', label: '信号强度', value: (rssi || 0) + ' dBm' })
+      rows.push({ key: 'raw', label: '原始数据', value: p1 || p2 || '' })
+    }
+    this.setData({ deviceStatus: rows, updateTime: new Date().toLocaleString() })
+    if (p1) this.syncInputs(p1, isNew)
+  },
+  // 回读到的参数回填到控制表单，保证「读取后再调整」的数值正确
+  syncInputs(p1, isNew) {
+    const b = k => parseInt(p1.slice(2 + 2 * k, 4 + 2 * k), 16) || 0
+    if (isNew) {
+      const sb = k => { const n = parseInt(p1.slice(2 + 2 * k, 4 + 2 * k), 16) || 0; return n > 127 ? n - 256 : n }
+      this.setData({
+        p_pressure: String(b(2) * 10),   // 设定压力 KPa
+        p_position: b(9),                 // 阀门圈数
+        p_limitU: b(11),                  // 圈数上限
+        p_limitL: b(12),                  // 圈数下限
+        p_compIn: String(sb(3)),          // 进水压力补偿 KPa
+        p_compRet: String(sb(4)),         // 回水压力补偿 KPa
+        p_spMin: b(13) * 10,              // 采样周期 分钟
+        p_rpOnMin: b(14) * 10,            // 上报周期(供暖期) 分钟
+      })
+    } else {
+      const modeIdx = workModeCodes.indexOf(b(0))
+      this.setData({
+        p_opening: b(2), p_limitU: b(3) || 100, p_limitL: b(4),
+        p_spMin: b(5) * 10 || 30, p_rpOnMin: b(6) * 10 || 30, p_rpOffDay: b(7) || 3,
+        p_modeIdx: modeIdx >= 0 ? modeIdx : 0,
+      })
+    }
   },
   updateDashboard(hex, rssi) {
     this._lastRssi = rssi
-    if (hex.slice(0, 2) === '3F' && hex.length >= 32) {
-      this.doParse(hex)
-    } else {
-      this.setData({
-        deviceStatus: [
-          { key: 'rssi', label: '信号强度', value: (rssi || 0) + ' dBm' },
-          { key: 'raw', label: '原始数据', value: hex }
-        ],
-        updateTime: new Date().toLocaleString()
-      })
-    }
+    const head = hex.slice(0, 2)
+    if (head === '3F' && hex.length >= 32) this._page1Hex = hex
+    else if (head === '4F' && hex.length >= 32) this._page2Hex = hex
+    this.renderStatus(rssi)
   },
   finishRead() {
     this.clearTimer()
@@ -599,6 +732,17 @@ createPage({
   sendControlCmd(e) {
     const action = e.currentTarget.dataset.action
     if (!this.data.configAddress || this.data.cmdLoading) return
+    // 先导阀是压力阀，无开/关指令：全开=同步阀门圈数到「圈数上限」，全关=同步到0
+    if (this.data.mode === 'new') {
+      let pos = 0
+      if (action === 'openAll') {
+        const p1 = this._page1Hex
+        if (!p1) { wx.showToast({ icon: 'none', title: '请先读取设备获取圈数上限' }); return }
+        pos = parseInt(p1.slice(24, 26), 16) || 0   // data[11] = 圈数上限
+      }
+      this.execCmd('syncValvePosition', null, [pos])
+      return
+    }
     this.setData({ cmdLoading: true })
     const cmd = this.buildCtrlCmd(action)
     if (!cmd) { this.setData({ cmdLoading: false }); return }
@@ -625,7 +769,14 @@ createPage({
   /* ========== 配置相关 ========== */
   toggleConfig() { this.setData({ showConfig: !this.data.showConfig }) },
   onChannelChange(e) {
-    this.setData({ configChannel: e.detail.value })
+    const idx = e.detail.value
+    this.setData({ configChannel: idx })
+    wx.setStorageSync('channel', channels[idx])
+  },
+  onAddressBlur(e) {
+    const addr = (e.detail.value || '').replace(/\s+/g, '').toLowerCase()
+    this.setData({ configAddress: addr })
+    if (addr.length >= 6 && addr.length <= 10) wx.setStorageSync('address', addr)
   },
   loadLogs() {
     const logs = wx.getStorageSync('broadcastHistory') || []
@@ -949,6 +1100,8 @@ createPage({
   color: var(--tertiary);
   display: block;
 }
+.db-card.full { grid-column: 1 / -1; }
+.db-highlight { color: #ff3141; }
 .app.dark .db-card-label {
   font-size: 18rpx;
   letter-spacing: 1rpx;
