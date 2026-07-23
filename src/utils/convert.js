@@ -19,6 +19,14 @@ export function formatTimeDiff(timestamp) {
   return Math.floor(mins / 1440) + '天前'
 }
 
+// 绝对时间：MM-DD HH:mm，用于连接记录显示实际连接时间
+export function formatTime(timestamp) {
+  if (!timestamp) return ''
+  const d = new Date(timestamp)
+  const p = n => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 export function batteryLevel(voltageMv) {
   const v = voltageMv / 1000
   if (v >= 3.6) return 100

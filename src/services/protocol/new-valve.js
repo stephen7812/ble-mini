@@ -85,6 +85,10 @@ export const NEW_COMMANDS = {
   setTargetPressure: (pressure10KPa) => buildFrame(0x2, 2, [pressure10KPa]),
   setPositionLimits: (upper, lower) => buildFrame(0x2, 3, [upper, lower]),
   setPressureCompensation: (inlet, ret) => buildFrame(0x2, 4, [inlet, ret]),
+  // 分时压力：数据域 = 使能(1B) + 5×(时间1B[×10=当日分钟,0xFF=停用], 压力1B[×10KPa])。
+  // 回归基准(官方 app 实测)：setTimePressure(false, 0,50, 33,60, 48,86, 108,30, 132,30)
+  //   → 数据域 00 00 32 21 3c 30 56 6c 1e 84 1e，整帧 2c5{seq}000032213c30566c1e841effffff
+  //   （5 段时刻 00:00/05:30/08:00/18:00/22:00，压力 500/600/860/300/300 KPa；byte1 低4位为运行时序号）
   setTimePressure: (enabled, ...slots) =>
     buildFrame(0x2, 5, [enabled ? 1 : 0, ...slots]),
   setPressureLimits: (inletUpper, inletLower, returnUpper, returnLower) =>

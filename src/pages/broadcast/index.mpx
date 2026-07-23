@@ -20,19 +20,69 @@
         </view>
       </view>
 
-      <button class="db-read-btn" bindtap="startRead" disabled="{{readStatus.isReading}}">
-        <text wx:if="{{!readStatus.isReading}}">读取设备状态</text>
-        <text wx:if="{{readStatus.isReading}}">读取中…</text>
+      <button class="db-read-btn {{readStatus.isReading ? 'reading' : ''}}" bindtap="startRead" disabled="{{readStatus.isReading}}">
+        <block wx:if="{{readStatus.isReading}}">
+          <view class="db-spinner"></view>
+          <text>读取中…</text>
+        </block>
+        <text wx:else>读取设备状态</text>
       </button>
 
-      <view wx:if="{{deviceStatus.length > 0}}" class="db-cards">
-        <view wx:for="{{deviceStatus}}" wx:key="key" class="db-card {{item.full ? 'full' : ''}}">
-          <text class="db-card-val {{item.highlight ? 'db-highlight' : ''}}">{{item.value}}</text>
-          <text class="db-card-label">{{item.label}}</text>
-        </view>
-      </view>
+      <button wx:if="{{page2Failed && !readStatus.isReading}}" class="db-retry-btn" bindtap="retryPage2">
+        <text class="db-retry-icon">↻</text>
+        <text>第二页无响应，重读第二页</text>
+      </button>
 
-      <view wx:if="{{!deviceStatus.length && !readStatus.isReading}}" class="db-placeholder">
+      <block wx:if="{{dashboard}}">
+        <!-- 故障告警条（有故障才显示） -->
+        <view wx:if="{{dashboard.alert}}" class="db-alert">
+          <text class="db-alert-icon">!</text>
+          <view class="db-alert-body">
+            <text class="db-alert-title">设备告警</text>
+            <text class="db-alert-text">{{dashboard.alert}}</text>
+          </view>
+        </view>
+
+        <!-- 分组参数卡片 -->
+        <view wx:for="{{dashboard.groups}}" wx:key="title" class="db-group">
+          <view class="db-group-head">
+            <view class="db-group-bar"></view>
+            <text class="db-group-title">{{item.title}}</text>
+          </view>
+          <view class="db-grid">
+            <view wx:for="{{item.items}}" wx:for-item="cell" wx:key="key" class="db-cell {{cell.full ? 'full' : ''}}">
+              <text class="db-cell-val">{{cell.value}}</text>
+              <text class="db-cell-label">{{cell.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 分时压力独立区 -->
+        <view wx:if="{{dashboard.timeShare}}" class="db-group db-ts">
+          <view class="db-ts-head">
+            <view class="db-group-head">
+              <view class="db-group-bar db-ts-bar"></view>
+              <text class="db-group-title">分时压力</text>
+            </view>
+            <text class="db-ts-badge {{dashboard.timeShare.enabled ? 'on' : 'off'}}">{{dashboard.timeShare.enabled ? '开启' : '关闭'}}</text>
+          </view>
+          <view wx:if="{{dashboard.timeShare.slots.length > 0}}" class="db-ts-list">
+            <view wx:for="{{dashboard.timeShare.slots}}" wx:key="key" class="db-ts-row">
+              <text class="db-ts-idx">{{item.label}}</text>
+              <text class="db-ts-range">{{item.range}}</text>
+              <text class="db-ts-kpa">{{item.kpa}}</text>
+            </view>
+          </view>
+          <view wx:else class="db-ts-empty">未配置分时段</view>
+        </view>
+
+        <view wx:if="{{updateTime}}" class="db-updated">
+          <text class="db-updated-dot"></text>
+          <text>最后更新 {{updateTime}}</text>
+        </view>
+      </block>
+
+      <view wx:if="{{!dashboard && !readStatus.isReading}}" class="db-placeholder">
         <text class="db-placeholder-icon">◉</text>
         <text class="db-placeholder-text">点击上方按钮读取设备参数</text>
       </view>
@@ -44,15 +94,15 @@
         <text class="ctrl-section-title">快速操作</text>
         <view class="ctrl-quick">
           <button class="ctrl-btn ctrl-open" data-action="openAll" bindtap="sendControlCmd">
-            <text class="ctrl-btn-icon">▲</text>
+            <text class="ctrl-btn-icon">○</text>
             <text class="ctrl-btn-label">全开</text>
           </button>
           <button class="ctrl-btn ctrl-close" data-action="closeAll" bindtap="sendControlCmd">
-            <text class="ctrl-btn-icon">▼</text>
+            <text class="ctrl-btn-icon">⊘</text>
             <text class="ctrl-btn-label">全关</text>
           </button>
           <button class="ctrl-btn ctrl-reset" bindtap="execCmd('deviceReset','复位设备？')">
-            <text class="ctrl-btn-icon">⟳</text>
+            <text class="ctrl-btn-icon">↺</text>
             <text class="ctrl-btn-label">复位</text>
           </button>
         </view>
@@ -139,8 +189,8 @@
           <view class="pf-row">
             <text class="pf-label">目标压力</text>
             <view class="pf-inp">
-              <input class="pf-input" type="digit" model:value="{{p_pressure}}" placeholder="0~250" />
-              <text class="pf-unit">KPa</text>
+              <input class="pf-input" type="digit" model:value="{{p_pressure}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
             </view>
           </view>
           <button class="pf-btn" bindtap="sendTargetPressure">设定</button>
@@ -166,6 +216,114 @@
             </view>
           </view>
           <button class="pf-btn" bindtap="execCmd('setPressureCompensation',null,[p_compIn,p_compRet])">补偿</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">圈数限位</text>
+          <view class="pf-row">
+            <text class="pf-label">上限/下限</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_limitU}}" placeholder="上限" />
+              <text class="pf-unit">/</text>
+              <input class="pf-input" type="digit" model:value="{{p_limitL}}" placeholder="下限" />
+            </view>
+          </view>
+          <button class="pf-btn" bindtap="execCmd('setPositionLimits',null,[p_limitU,p_limitL])">设限</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">压力上下限</text>
+          <view class="pf-row">
+            <text class="pf-label">进水上限</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_inletUpper}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">进水下限</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_inletLower}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">回水上限</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_retUpper}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">回水下限</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_retLower}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <button class="pf-btn" bindtap="sendPressureLimits">设限</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">上报周期</text>
+          <view class="pf-row">
+            <text class="pf-label">采样周期</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_spMin}}" placeholder="10~2550" />
+              <text class="pf-unit">分</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">供暖上报</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_rpOnMin}}" placeholder="10~2550" />
+              <text class="pf-unit">分</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">非供暖上报</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_rpOffDay}}" placeholder="1~255" />
+              <text class="pf-unit">天</text>
+            </view>
+          </view>
+          <button class="pf-btn" bindtap="sendReportCycle">设定</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <text class="pf-group-title">压力报警阈值</text>
+          <view class="pf-row">
+            <text class="pf-label">进水阈值</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_threshIn}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <view class="pf-row">
+            <text class="pf-label">回水阈值</text>
+            <view class="pf-inp">
+              <input class="pf-input" type="digit" model:value="{{p_threshRet}}" placeholder="0~160" />
+              <text class="pf-unit">×10KPa</text>
+            </view>
+          </view>
+          <button class="pf-btn" bindtap="sendPressureThreshold">设限</button>
+        </view>
+
+        <view class="pf-field pf-group">
+          <view class="pf-row">
+            <text class="pf-group-title">分时压力</text>
+            <switch class="ps-main-sw" checked="{{p_psEnable}}" bindchange="onPsEnableToggle" />
+          </view>
+          <view class="ps-slot" wx:for="{{p_slots}}" wx:key="id">
+            <text class="ps-idx">分时{{index + 1}}</text>
+            <picker class="ps-time" mode="time" value="{{item.time}}" data-idx="{{index}}" bindchange="onSlotTime" disabled="{{!item.on}}">
+              <view class="ps-time-val {{item.on ? '' : 'ps-off'}}">{{item.on ? item.time : '--:--'}}</view>
+            </picker>
+            <input class="ps-kpa" type="digit" value="{{item.kpa}}" data-idx="{{index}}" bindinput="onSlotKpa" placeholder="1~160" disabled="{{!item.on}}" />
+            <text class="ps-unit">×10KPa</text>
+            <switch class="ps-sw" checked="{{item.on}}" data-idx="{{index}}" bindchange="onSlotToggle" />
+          </view>
+          <button class="pf-btn" bindtap="sendTimePressure">下发分时压力</button>
         </view>
       </view>
 
@@ -238,6 +396,11 @@ import { generateDataWithAddr } from '../../services/beacon/bleUtil'
 
 const FILTER_NAME = 'ANTS'
 const MANUFACTURER_ID = '0x00C7'
+// ===== 读取指令的时序预算（决定「读取超时」何时触发）=====
+// 一次读取 = 「广播命令 AD_DURATION 毫秒 → 静默 RESEND_DELAY 毫秒等回复 → 未收到则重试」，最多 MAX_RETRIES 次。
+// 单次读取最长耗时 ≈ MAX_RETRIES × (AD_DURATION + RESEND_DELAY) ≈ 3 ×1600ms ≈ 4.8s，超时即报「设备无响应」。
+// 注意：手机只在 AD_DURATION(400ms) 这个窗口内发射命令，其余 1200ms 处于静默；若设备的接收占空比错过这 400ms 窗口，
+// 就收不到命令、也就不会回复 → 表现为「读取超时」。这是超时最常见的成因（配合信道/地址/距离），并非解析逻辑出错。
 const AD_DURATION = 400
 const RESEND_DELAY = 1200
 const MAX_RETRIES = 3
@@ -288,9 +451,40 @@ function s8(v) { const n = parseInt(v, 16) || 0; return n > 127 ? n - 256 : n }
 function kpa10(v) { return `${u8(v) * 10} KPa` }        // 单位10KPa
 function kpaS8(v) { return `${s8(v)} KPa` }             // INT8 补偿
 function min10(v) { return `${u8(v) * 10} 分钟` }       // 单位10分钟
-function slot(v) {                                      // 4 hex：时(1B)+压(1B)
-  const t = u8(v.slice(0, 2))
-  return t === 255 ? '未启用' : `${t * 10}分钟 · ${u8(v.slice(2, 4)) * 10}KPa`
+function hhmm(min) {                                    // 当日分钟数 → HH:MM（如 0→00:00，1440→24:00）
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+// 分时压力：5 段，每段 时(1B,×10=当日分钟) + 压(1B,×10KPa)。0xFF=未启用跳过。
+// 解析成时间段：本段起始 → 下一段起始（末段至 24:00），range 与 kpa 分列，供仪表盘独立区展示。
+function timeSlotRows(p2) {
+  const slots = []
+  for (let i = 0; i < 5; i++) {
+    const off = 4 + i * 4
+    const tb = u8(p2.slice(off, off + 2))
+    if (tb === 255) continue
+    slots.push({ idx: i + 1, start: tb * 10, kpa: u8(p2.slice(off + 2, off + 4)) * 10 })
+  }
+  return slots.map((s, k) => {
+    const end = k + 1 < slots.length ? slots[k + 1].start : 1440
+    return { key: `slot${s.idx}`, label: `时段 ${s.idx}`,
+      range: `${hhmm(s.start)} - ${hhmm(end)}`, kpa: `${s.kpa} KPa` }
+  })
+}
+// 表单 → setTimePressure 入参 [使能, t1,p1,...,t5,p5]。时间HH:MM→分钟/10取整，压力×10KPa直接字节，停用段=255/0。
+function slotsToParams(enable, slots) {
+  const params = [enable ? 1 : 0]
+  for (let i = 0; i < 5; i++) {
+    const s = slots[i] || {}
+    if (s.on && s.time) {
+      const [h, m] = String(s.time).split(':').map(Number)
+      params.push(Math.round((h * 60 + m) / 10), Number(s.kpa) || 0)
+    } else {
+      params.push(255, 0)
+    }
+  }
+  return params
 }
 
 // 状态/功能位语义化：BLE 单字节只承载 V902ZF 状态字的低8位(BIT0~7)，高8位(电池欠压/SIM/4G/网络等)仅物联网上报
@@ -334,16 +528,19 @@ const PAGE1_LAYOUT_NEW = [
 
 // 查询第二页 回复 0x4F（15 字节数据域）
 const PAGE2_LAYOUT_NEW = [
-  { key: 'timeEnable', label: '分时压力', start: 2, end: 4, parse: v => u8(v) === 1 ? '使能' : '禁止' },
-  { key: 'slot1', label: '分时1', start: 4, end: 8, parse: slot },
-  { key: 'slot2', label: '分时2', start: 8, end: 12, parse: slot },
-  { key: 'slot3', label: '分时3', start: 12, end: 16, parse: slot },
-  { key: 'slot4', label: '分时4', start: 16, end: 20, parse: slot },
-  { key: 'slot5', label: '分时5', start: 20, end: 24, parse: slot },
+  { key: 'timeEnable', label: '分时压力', start: 2, end: 4, parse: v => u8(v) === 1 ? '开启' : '关闭' },
   { key: 'inletThreshold', label: '进水压力阈值', start: 24, end: 26, parse: kpa10 },
   { key: 'returnThreshold', label: '回水压力阈值', start: 26, end: 28, parse: kpa10 },
   { key: 'battery', label: '电池电压', start: 28, end: 30, parse: v => `${((u8(v) + 300) / 100).toFixed(2)} V` },
   { key: 'signal', label: '信号值', start: 30, end: 32, parse: v => `${u8(v)}` },
+]
+
+// 仪表盘分组：把两页参数按语义归到「压力 / 阀位 / 设备」三组卡片展示。
+// status(故障) 单独提为顶部告警，timeEnable+分时段 单独成「分时压力」区，均不进这些分组。
+const NEW_DASH_GROUPS = [
+  { title: '压力', keys: ['inletPressure', 'returnPressure', 'setPressure', 'inletComp', 'returnComp', 'returnUpper', 'returnLower', 'inletThreshold', 'returnThreshold'] },
+  { title: '阀位', keys: ['valvePosition', 'targetPosition', 'posUpper', 'posLower'] },
+  { title: '设备', keys: ['sampleCycle', 'reportCycle', 'battery', 'signal', 'funcBits'] },
 ]
 
 function ab2hex(buffer) {
@@ -388,10 +585,21 @@ createPage({
     p_opening: 50, p_modeIdx: 1, p_limitU: 100, p_limitL: 0,
     p_pressure: '20', p_position: 0, p_compIn: '0', p_compRet: '0',
     p_spMin: 30, p_rpOnMin: 30, p_rpOffDay: 3,
+    p_retUpper: '', p_retLower: '',       // 回水压力上/下限（×10KPa 字节值，page1 data[5][6]）
+    p_inletUpper: '', p_inletLower: '',   // 进水压力上/下限（×10KPa 字节值，设备不回读）
+    p_inletCurrent: 0,                    // 进水当前压力字节（page1 data[0]，作为分时压力上限兜底）
+    p_threshIn: '', p_threshRet: '',      // 进水/回水压力报警阈值（×10KPa 字节值，page2 data[11][12]）
+    p_psEnable: false,                       // 分时压力总使能
+    p_slots: [                               // 5 段：on=启用 time=HH:MM kpa=压力
+      { id: 0, on: false, time: '00:00', kpa: '' }, { id: 1, on: false, time: '00:00', kpa: '' },
+      { id: 2, on: false, time: '00:00', kpa: '' }, { id: 3, on: false, time: '00:00', kpa: '' },
+      { id: 4, on: false, time: '00:00', kpa: '' },
+    ],
     logs: [], workModes, workModeCodes,
-    deviceStatus: [],
+    dashboard: null,
     updateTime: '',
     readStatus: { isReading: false, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null },
+    page2Failed: false,
     readMode: 'single',
   },
   onLoad() {
@@ -504,7 +712,7 @@ createPage({
                 'readStatus.page1Done': true,
                 'readStatus.page1Data': hex
               })
-              this.updateDashboard(hex, rssi)
+              this.storePage(hex, rssi)
               this.finishRead()
               return
             }
@@ -517,7 +725,7 @@ createPage({
                   'readStatus.page1Done': true,
                   'readStatus.page1Data': hex
                 })
-                this.updateDashboard(hex, rssi)
+                this.storePage(hex, rssi)
                 this.updateStatus('已收第一页，开始读取第二页', 'status-processing')
                 this.startPage2()
                 return
@@ -529,7 +737,7 @@ createPage({
                   'readStatus.page2Done': true,
                   'readStatus.page2Data': hex
                 })
-                this.updateDashboard(hex, rssi)
+                this.storePage(hex, rssi)
                 this.finishRead()
                 return
               }
@@ -557,13 +765,17 @@ createPage({
     this.setData({
       cmdLoading: true,
       readMode,
+      page2Failed: false,
       readStatus: { isReading: true, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null }
     })
     this.updateStatus('正在读取状态...', 'status-processing')
     this.loopPage1()
   },
   loopPage1() {
+    // 守卫：读取已停止 / 第一页已收到，则不再重发（由收到 3F 的分支 clearTimer 并推进流程）
     if (!this.data.readStatus.isReading || this.data.readStatus.page1Done) return
+    // 已重发 MAX_RETRIES 次仍未收到 3F 回复 → 判定「读取超时，设备无响应」
+    // 这不是解析 bug：是在时序预算内没扫到设备回帧。排查方向：广播信道、设备地址、距离/设备是否休眠。
     if (this._readRetries >= MAX_RETRIES) {
       this.finishRead()
       this.updateStatus('读取超时', 'status-error')
@@ -571,6 +783,8 @@ createPage({
       return
     }
     this._readRetries++
+    // 发一帧 queryPage1；发送回调里再装配「RESEND_DELAY 后重试」的定时器。
+    // 收到 3F 时会 clearTimer 打断该定时器；否则到点后回到 loopPage1 走下一次重试或超时。
     this.sendCmd('queryPage1', () => {
       this.setData({
         'readStatus.timer': setTimeout(() => this.loopPage1(), RESEND_DELAY)
@@ -582,14 +796,31 @@ createPage({
     this.updateStatus('正在读取第二页...', 'status-processing')
     this.loopPage2()
   },
+  // 仅重读第二页：保留已读到的第一页(_page1Hex)，只重跑 page2 流程。
+  // 收到 4F 后走 onBLEFound 的 full/page2 分支 → storePage + finishRead 合并渲染两页。
+  retryPage2() {
+    if (this.data.readStatus.isReading) return
+    if (!this._page1Hex) { wx.showToast({ title: '请先读取设备', icon: 'none' }); return }
+    this.setData({
+      cmdLoading: true,
+      readMode: 'full',
+      page2Failed: false,
+      // page1Done=true 让接收分支直接进入「等待 4F」；保留第一页原始数据
+      readStatus: { isReading: true, page1Done: true, page2Done: false, page1Data: this._page1Hex, page2Data: '', timer: null },
+    })
+    this.startPage2()
+  },
   loopPage2() {
     if (!this.data.readStatus.isReading || this.data.readStatus.page2Done) return
     this.loopPage2Cmd()
   },
   loopPage2Cmd() {
-    // 第二页超时：第一页已成功，按部分完成收尾（保留第一页数据）
+    // 守卫：已完成/已停止读取则直接返回，避免异步回调装配的孤儿定时器把成功状态改写为「无响应」
+    if (!this.data.readStatus.isReading || this.data.readStatus.page2Done) return
+    // 第二页超时：第一页已成功，按部分完成收尾（保留第一页数据），并置 page2Failed 让界面出现「重读第二页」
     if (this._readRetries2 >= MAX_RETRIES) {
       this.finishRead()
+      this.setData({ page2Failed: true })
       this.updateStatus('第二页无响应，仅显示第一页', 'status-success')
       return
     }
@@ -607,8 +838,8 @@ createPage({
     const hex = toHex(cmd)
     this.sendRaw(hex, callback)
   },
+  // 把一帧命令 hex 通过 BLE 外围广播发出去。设备收到后会回广播，由 onBLEFound 扫描解析。
   sendRaw(hex, callback) {
-    this.stopAdvertising()
     this.logCmd(hex)
     const addr = (this.data.configAddress || '').replace(/\s+/g, '').toLowerCase()
     if (addr.length < 6 || addr.length > 10) {
@@ -616,6 +847,8 @@ createPage({
       callback && callback(); return
     }
     wx.setStorageSync('address', addr)
+    // 按设备地址 + 信道对 payload 做加白/CRC 编码（信道取 storage 'channel'，默认 37）。
+    // 若此处信道与设备实际工作信道不一致，设备无法解码 → 不回复 → 读取超时。
     const actPayload = generateDataWithAddr(addr, hex)
     if (!actPayload) { callback && callback(); return }
     const buf = new ArrayBuffer(actPayload.length)
@@ -625,26 +858,31 @@ createPage({
     }
     const srv = this._bleServer
     if (!srv) { callback && callback(); return }
-    srv.startAdvertising({
+    // 关键：先 await 上一次广播停止，再发起新广播。避免 stop 未完成时 startAdvertising 被适配器拒绝，
+    // 那样会走 .catch 空转一次重试（只等待、没真正发命令），是此前读取超时偏多的脆弱点。
+    this.stopAdvertising().then(() => srv.startAdvertising({
       advertiseRequest: {
         connectable: true,
         deviceName: '',
         manufacturerData: [{ manufacturerId: MANUFACTURER_ID, manufacturerSpecificData: buf }],
       },
       powerLevel: 'high',
-    }).then(() => {
+    })).then(() => {
       this.setData({ advertiseStart: true })
+      // 只广播 AD_DURATION(400ms) 后即停，并触发 callback（在 loopPageX 里 callback 负责装配重试定时器）。
       setTimeout(() => {
         this.stopAdvertising()
         callback && callback()
       }, AD_DURATION)
     }).catch(() => { callback && callback() })
   },
+  // 停止广播。返回 Promise，便于 sendRaw 在「停止完成后」再发起新广播（消除 stop/start 竞态）。
   stopAdvertising() {
-    if (this._bleServer) {
-      this._bleServer.stopAdvertising().catch(() => {})
-    }
     this.setData({ advertiseStart: false })
+    if (this._bleServer) {
+      return this._bleServer.stopAdvertising().catch(() => {})
+    }
+    return Promise.resolve()
   },
   getSeq() {
     const map = '0123456789abcdef'
@@ -652,34 +890,48 @@ createPage({
     this._seq = (this._seq || 0) + 1
     return c
   },
-  // 按当前设备协议渲染已收到的页数据（先导阀=新协议，可合并第一/第二页）
-  renderStatus(rssi) {
+  // 把已收到的页数据渲染成「分组仪表盘」结构（读取全部完成后统一调用一次，布局不随分页到达而抖动）。
+  // dashboard = { alert:故障文本, groups:[{title,items:[{key,label,value,full}]}], timeShare:{enabled,slots}|null }
+  renderStatus() {
     const isNew = this.data.mode === 'new'
     const p1 = this._page1Hex
     const p2 = this._page2Hex
-    const rows = []
-    if (p1) {
-      const layout = isNew ? PAGE1_LAYOUT_NEW : PAGE1_LAYOUT
-      layout.forEach(i => {
-        if (!i.parse) return
-        const value = i.parse(p1.slice(i.start, i.end))
-        const row = { key: i.key, label: i.label, value }
-        if (i.key === 'status') row.highlight = value !== '正常'   // 有故障标红
-        if ((i.key === 'status' || i.key === 'funcBits') && value.length > 6) row.full = true  // 太长单独整行
-        rows.push(row)
+    if (!p1 && !p2) { this.setData({ dashboard: null }); return }
+
+    if (isNew) {
+      // 汇总两页所有可解析字段到 key→{label,value}（分时使能单独处理，不进此表）
+      const vals = {}
+      if (p1) PAGE1_LAYOUT_NEW.forEach(i => { if (i.parse) vals[i.key] = { label: i.label, value: i.parse(p1.slice(i.start, i.end)) } })
+      if (p2) PAGE2_LAYOUT_NEW.forEach(i => { if (i.parse && i.key !== 'timeEnable') vals[i.key] = { label: i.label, value: i.parse(p2.slice(i.start, i.end)) } })
+
+      // 故障状态 → 顶部告警条（正常则不显示）
+      let alert = ''
+      if (p1) { const st = valveStatus(p1.slice(16, 18)); if (st !== '正常') alert = st }
+
+      // 按语义分组，仅保留有数据的组/项；长文本(如功能位)整行占满
+      const groups = NEW_DASH_GROUPS.map(g => ({
+        title: g.title,
+        items: g.keys.filter(k => vals[k]).map(k => ({
+          key: k, label: vals[k].label, value: vals[k].value, full: vals[k].value.length > 8,
+        })),
+      })).filter(g => g.items.length)
+
+      // 分时压力独立区：开启状态 + 已启用时段列表
+      const timeShare = p2 ? { enabled: u8(p2.slice(2, 4)) === 1, slots: timeSlotRows(p2) } : null
+
+      this.setData({ dashboard: { alert, groups, timeShare }, updateTime: new Date().toLocaleString() })
+      if (p1) this.syncInputs(p1, true)
+      if (p2) this.syncTimeSlots(p2)
+    } else {
+      // 旧阀：单组扁平展示
+      const items = []
+      if (p1) PAGE1_LAYOUT.forEach(i => { if (i.parse) items.push({ key: i.key, label: i.label, value: i.parse(p1.slice(i.start, i.end)), full: false }) })
+      this.setData({
+        dashboard: { alert: '', groups: items.length ? [{ title: '参数', items }] : [], timeShare: null },
+        updateTime: new Date().toLocaleString(),
       })
+      if (p1) this.syncInputs(p1, false)
     }
-    if (isNew && p2) {
-      PAGE2_LAYOUT_NEW.forEach(i => {
-        if (i.parse) rows.push({ key: i.key, label: i.label, value: i.parse(p2.slice(i.start, i.end)) })
-      })
-    }
-    if (!rows.length) {
-      rows.push({ key: 'rssi', label: '信号强度', value: (rssi || 0) + ' dBm' })
-      rows.push({ key: 'raw', label: '原始数据', value: p1 || p2 || '' })
-    }
-    this.setData({ deviceStatus: rows, updateTime: new Date().toLocaleString() })
-    if (p1) this.syncInputs(p1, isNew)
   },
   // 回读到的参数回填到控制表单，保证「读取后再调整」的数值正确
   syncInputs(p1, isNew) {
@@ -687,14 +939,17 @@ createPage({
     if (isNew) {
       const sb = k => { const n = parseInt(p1.slice(2 + 2 * k, 4 + 2 * k), 16) || 0; return n > 127 ? n - 256 : n }
       this.setData({
-        p_pressure: String(b(2) * 10),   // 设定压力 KPa
-        p_position: b(9),                 // 阀门圈数
-        p_limitU: b(11),                  // 圈数上限
-        p_limitL: b(12),                  // 圈数下限
-        p_compIn: String(sb(3)),          // 进水压力补偿 KPa
-        p_compRet: String(sb(4)),         // 回水压力补偿 KPa
-        p_spMin: b(13) * 10,              // 采样周期 分钟
-        p_rpOnMin: b(14) * 10,            // 上报周期(供暖期) 分钟
+        p_pressure: String(b(2)),           // 设定压力（×10KPa 字节值）
+        p_position: b(9),                   // 阀门圈数
+        p_limitU: b(11),                    // 圈数上限
+        p_limitL: b(12),                    // 圈数下限
+        p_compIn: String(sb(3)),            // 进水压力补偿 KPa（INT8，1KPa/unit）
+        p_compRet: String(sb(4)),           // 回水压力补偿 KPa
+        p_retUpper: String(b(5)),           // 回水压力上限（×10KPa 字节值）
+        p_retLower: String(b(6)),           // 回水压力下限（×10KPa 字节值）
+        p_inletCurrent: b(0),              // 进水当前压力字节（分时压力上限兜底）
+        p_spMin: b(13) * 10,               // 采样周期 分钟（×10 转分）
+        p_rpOnMin: b(14) * 10,             // 上报周期(供暖期) 分钟
       })
     } else {
       const modeIdx = workModeCodes.indexOf(b(0))
@@ -705,12 +960,32 @@ createPage({
       })
     }
   },
-  updateDashboard(hex, rssi) {
+  // 第二页读回后，把分时压力使能与 5 段回填到设置表单（0xFF=停用）
+  syncTimeSlots(p2) {
+    const slots = []
+    for (let i = 0; i < 5; i++) {
+      const off = 4 + i * 4
+      const tb = u8(p2.slice(off, off + 2))
+      if (tb === 255) { slots.push({ id: i, on: false, time: '00:00', kpa: '' }) }
+      else { slots.push({ id: i, on: true, time: hhmm(tb * 10), kpa: String(u8(p2.slice(off + 2, off + 4))) }) }
+    }
+    this.setData({
+      p_psEnable: u8(p2.slice(2, 4)) === 1, p_slots: slots,
+      p_threshIn: String(u8(p2.slice(24, 26))),    // 进水压力阈值（×10KPa 字节值）
+      p_threshRet: String(u8(p2.slice(26, 28))),   // 回水压力阈值（×10KPa 字节值）
+    })
+  },
+  // 仅缓存收到的页数据，不渲染（读取过程中调用，避免布局随分页逐页刷新而抖动）
+  storePage(hex, rssi) {
     this._lastRssi = rssi
     const head = hex.slice(0, 2)
     if (head === '3F' && hex.length >= 32) this._page1Hex = hex
     else if (head === '4F' && hex.length >= 32) this._page2Hex = hex
-    this.renderStatus(rssi)
+  },
+  // 缓存 + 即时渲染（被动监听场景：非读取流程中收到 3F 广播时实时更新）
+  updateDashboard(hex, rssi) {
+    this.storePage(hex, rssi)
+    this.renderStatus()
   },
   finishRead() {
     this.clearTimer()
@@ -720,14 +995,63 @@ createPage({
       cmdLoading: false,
       readStatus: { isReading: false, page1Done: false, page2Done: false, page1Data: '', page2Data: '', timer: null }
     })
+    // 读取结束后一次性把所有已缓存页渲染到仪表盘，保证各显示区同时出现、布局稳定
+    this.renderStatus()
     this.updateStatus('读取完成', 'status-success')
   },
 
   /* ========== Send 控制指令（不用回读） ========== */
   sendTargetPressure() {
-    const v = Math.round(Number(this.data.p_pressure) / 10) || 0
-    if (v < 0 || v > 25) { wx.showToast({ title: '压力范围0~250KPa', icon: 'none' }); return }
+    const v = Number(this.data.p_pressure) || 0    // 控制页单位 ×10KPa，直接作为字节发送
+    if (v < 0 || v > 160) { wx.showToast({ title: '目标压力 0~160(×10KPa)', icon: 'none' }); return }
     this.execCmd('setTargetPressure', null, [v])
+  },
+  sendPressureLimits() {
+    const n = k => { const v = Number(this.data[k]) || 0; return v }
+    const vals = [n('p_inletUpper'), n('p_inletLower'), n('p_retUpper'), n('p_retLower')]
+    if (vals.some(v => v < 0 || v > 160)) { wx.showToast({ title: '压力值超出范围 0~160(×10KPa)', icon: 'none' }); return }
+    this.execCmd('setPressureLimits', '设置压力上下限？', vals)
+  },
+  sendReportCycle() {
+    const s = Math.round(Number(this.data.p_spMin) / 10)     // 分钟→×10min 字节
+    const r = Math.round(Number(this.data.p_rpOnMin) / 10)
+    const d = Number(this.data.p_rpOffDay) || 0
+    if (s < 1 || s > 255 || r < 1 || r > 255) { wx.showToast({ title: '采样/供暖上报需在 10~2550(分)', icon: 'none' }); return }
+    if (d < 1 || d > 255) { wx.showToast({ title: '非供暖上报需在 1~255(天)', icon: 'none' }); return }
+    this.execCmd('setReportCycle', null, [s, r, d])
+  },
+  sendPressureThreshold() {
+    const i = Number(this.data.p_threshIn) || 0
+    const r = Number(this.data.p_threshRet) || 0
+    if (i < 0 || i > 160 || r < 0 || r > 160) { wx.showToast({ title: '压力阈值超出范围 0~160(×10KPa)', icon: 'none' }); return }
+    this.execCmd('setPressureThreshold', null, [i, r])
+  },
+  // 分时压力：总使能 / 每段开关 / 时间 / 压力
+  onPsEnableToggle(e) { this.setData({ p_psEnable: e.detail.value }) },
+  onSlotToggle(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].on`]: e.detail.value }) },
+  onSlotTime(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].time`]: e.detail.value }) },
+  onSlotKpa(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].kpa`]: e.detail.value }) },
+  sendTimePressure() {
+    // 分时压力上限：优先取进水上限/当前进水压力，未设置则用硬顶 160(=1600KPa=1.6MPa)
+    const inletUpper = Number(this.data.p_inletUpper) || this.data.p_inletCurrent
+    const max = inletUpper ? Math.min(inletUpper, 160) : 160
+
+    const slots = this.data.p_slots
+    const active = []
+    for (let i = 0; i < 5; i++) {
+      const s = slots[i]
+      if (!s.on) continue
+      if (!s.time) { wx.showToast({ title: `分时${i + 1} 未选时间`, icon: 'none' }); return }
+      const [h, m] = s.time.split(':').map(Number)
+      const v = Number(s.kpa) || 0
+      if (v <= 0 || v > max) { wx.showToast({ title: `分时${i + 1} 压力需在 1~${max}(×10KPa)`, icon: 'none' }); return }
+      active.push({ min: h * 60 + m })
+    }
+    if (this.data.p_psEnable && !active.length) { wx.showToast({ title: '请至少启用一个时段', icon: 'none' }); return }
+    for (let k = 1; k < active.length; k++) {
+      if (active[k].min <= active[k - 1].min) { wx.showToast({ title: '时段时间需按先后递增', icon: 'none' }); return }
+    }
+    this.execCmd('setTimePressure', '下发分时压力设置？', slotsToParams(this.data.p_psEnable, slots))
   },
   sendControlCmd(e) {
     const action = e.currentTarget.dataset.action
@@ -958,7 +1282,6 @@ createPage({
 
   background: var(--bg);
 }
-.app.dark .db-card,
 .app.dark .ctrl-btn,
 .app.dark .ctrl-group,
 .app.dark .hist-item {
@@ -1072,41 +1395,148 @@ createPage({
 .app.dark .db-read-btn:active {
   box-shadow: 0 0 30rpx rgba(0,255,65,0.25);
 }
+.db-read-btn.reading {
+  gap: 14rpx;
+  opacity: 0.9;
+}
+.db-spinner {
+  width: 30rpx;
+  height: 30rpx;
+  border: 4rpx solid rgba(255,255,255,0.35);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: db-spin 0.7s linear infinite;
+}
+.app.dark .db-spinner {
+  border: 4rpx solid rgba(0,255,65,0.25);
+  border-top-color: var(--spring-green);
+}
+@keyframes db-spin {
+  to { transform: rotate(360deg); }
+}
 
-.db-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12rpx;
+/* 第二页无响应时的「重读第二页」按钮：次要/提示样式，区别于主读取按钮 */
+.db-retry-btn {
+  width: 100%;
+  height: 80rpx;
+  display: flex; align-items: center; justify-content: center; gap: 10rpx;
+  margin-bottom: 24rpx;
+  border-radius: var(--radius-lg);
+  background: rgba(232,168,124,0.14);
+  color: var(--warm-coral);
+  border: 1rpx solid rgba(232,168,124,0.35);
+  font-size: 26rpx; font-weight: 600;
 }
-.db-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 20rpx 12rpx;
-  text-align: center;
-  box-shadow: var(--card-shadow);
-}
-.db-card-val {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: var(--label);
-  display: block;
-  margin-bottom: 4rpx;
-}
-.app.dark .db-card-val {
+.db-retry-btn::after { border: none; }
+.db-retry-btn:active { opacity: 0.8; transform: scale(0.98); }
+.db-retry-icon { font-size: 30rpx; }
+.app.dark .db-retry-btn {
+  background: rgba(255,159,28,0.1);
+  color: var(--warm-orange);
+  border-color: rgba(255,159,28,0.3);
   font-family: var(--font-mono);
 }
-.db-card-label {
-  font-size: 20rpx;
-  color: var(--tertiary);
-  display: block;
+
+/* ---------- 故障告警条 ---------- */
+.db-alert {
+  display: flex; align-items: center; gap: 14rpx;
+  background: rgba(255,49,65,0.08);
+  border: 1rpx solid rgba(255,49,65,0.2);
+  border-radius: var(--radius-lg);
+  padding: 20rpx; margin-bottom: 16rpx;
 }
-.db-card.full { grid-column: 1 / -1; }
-.db-highlight { color: #ff3141; }
-.app.dark .db-card-label {
-  font-size: 18rpx;
+.db-alert-icon {
+  width: 44rpx; height: 44rpx; flex-shrink: 0;
+  border-radius: 50%; background: #ff3141; color: #FFF;
+  font-size: 30rpx; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.db-alert-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4rpx; }
+.db-alert-title { font-size: 22rpx; font-weight: 700; color: #ff3141; }
+.db-alert-text { font-size: 24rpx; color: var(--label); line-height: 1.4; }
+.app.dark .db-alert { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); }
+.app.dark .db-alert-icon { background: var(--warm-coral); color: #0A0A0F; }
+.app.dark .db-alert-title { color: var(--warm-coral); }
+
+/* ---------- 分组参数卡 ---------- */
+.db-group {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 22rpx 20rpx 18rpx;
+  margin-bottom: 16rpx;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.app.dark .db-group { border: 1rpx solid rgba(0,255,65,0.06); }
+/* 标题行：短色条 + 标题，色条只在标题左侧（不再贯穿整个模块） */
+.db-group-head { display: flex; align-items: center; margin-bottom: 16rpx; }
+.db-group-bar {
+  width: 6rpx; height: 26rpx; flex-shrink: 0;
+  border-radius: 4rpx; margin-right: 12rpx;
+  background: linear-gradient(180deg, var(--spring-green), var(--sky-bright));
+}
+.db-group-title {
+  font-size: 24rpx; font-weight: 700; color: var(--label);
   letter-spacing: 1rpx;
-  text-transform: uppercase;
 }
+.app.dark .db-group-title { color: var(--spring-green-dim); font-family: var(--font-mono); }
+.db-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1rpx; background: var(--border);
+  border: 1rpx solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.db-cell {
+  background: var(--surface);
+  padding: 18rpx 16rpx;
+  display: flex; flex-direction: column; gap: 6rpx;
+}
+.db-cell.full { grid-column: 1 / -1; }
+.db-cell-val {
+  font-size: 32rpx; font-weight: 700; color: var(--label);
+  line-height: 1.15; letter-spacing: -0.5rpx;
+}
+.app.dark .db-cell-val { font-family: var(--font-mono); }
+.db-cell-label { font-size: 20rpx; color: var(--tertiary); }
+
+/* ---------- 分时压力独立区 ---------- */
+.db-ts-bar { background: linear-gradient(180deg, var(--gold), var(--warm-orange)); }
+.db-ts-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+.db-ts-head .db-group-head { margin-bottom: 0; }
+.db-ts-badge { font-size: 20rpx; padding: 5rpx 18rpx; border-radius: 20rpx; font-weight: 600; }
+.db-ts-badge.on { background: rgba(107,170,94,0.15); color: var(--spring-green-bright); }
+.db-ts-badge.off { background: var(--surface-alt); color: var(--tertiary); }
+.app.dark .db-ts-badge.on { background: rgba(0,255,65,0.1); color: var(--spring-green); }
+.db-ts-list {
+  display: flex; flex-direction: column; gap: 1rpx;
+  background: var(--border); border: 1rpx solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.db-ts-row { display: flex; align-items: center; gap: 12rpx; background: var(--surface); padding: 16rpx; }
+.db-ts-idx { font-size: 22rpx; color: var(--tertiary); flex-shrink: 0; width: 84rpx; }
+.db-ts-range { flex: 1; font-size: 26rpx; font-weight: 600; color: var(--label); font-variant-numeric: tabular-nums; }
+.db-ts-kpa { font-size: 26rpx; font-weight: 700; color: var(--spring-green-bright); flex-shrink: 0; }
+.app.dark .db-ts-kpa { color: var(--spring-green); font-family: var(--font-mono); }
+.db-ts-empty { font-size: 24rpx; color: var(--tertiary); text-align: center; padding: 20rpx 0; }
+
+
+/* 最后更新时间 */
+.db-updated {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 20rpx;
+  font-size: 22rpx;
+  color: var(--tertiary);
+}
+.db-updated-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: var(--spring-green);
+}
+.app.dark .db-updated-dot { box-shadow: 0 0 6rpx var(--spring-green); }
 
 .db-placeholder {
   display: flex;
@@ -1163,6 +1593,8 @@ createPage({
 }
 .ctrl-btn-icon {
   font-size: 38rpx;
+  height: 48rpx;
+  line-height: 48rpx;   /* 固定行高：个别字形放大时不改变按钮整体高度 */
 }
 .ctrl-btn-label {
   font-size: 26rpx;
@@ -1171,7 +1603,8 @@ createPage({
 }
 .ctrl-open .ctrl-btn-icon { color: var(--spring-green); }
 .ctrl-close .ctrl-btn-icon { color: var(--warm-coral); }
-.ctrl-reset .ctrl-btn-icon { color: var(--warm-orange); }
+/* ↺(U+21BA) 字形本身偏小，加大字号与 ○/⊘ 视觉对齐 */
+.ctrl-reset .ctrl-btn-icon { color: var(--warm-orange); font-size: 46rpx; }
 
 /* ======================= PARAMETER FIELDS (card style) ========================== */
 .pf-field {
@@ -1216,6 +1649,27 @@ createPage({
   display: block; margin-bottom: 16rpx;
 }
 .app.dark .pf-group-title { color: var(--spring-green-dim); font-family: var(--font-mono); letter-spacing: 3rpx; }
+
+/* 分时压力 */
+.ps-main-sw { margin-left: auto; transform: scale(0.8); }
+.ps-slot { display: flex; align-items: center; gap: 10rpx; margin-bottom: 14rpx; }
+.ps-idx { font-size: 22rpx; color: var(--secondary); flex-shrink: 0; width: 78rpx; }
+.ps-time { flex-shrink: 0; }
+.ps-time-val {
+  min-width: 108rpx; height: 68rpx; line-height: 68rpx; text-align: center;
+  background: var(--input-bg); border-radius: var(--radius-sm);
+  font-size: 26rpx; color: var(--label); font-family: var(--font-mono);
+}
+.app.dark .ps-time-val { border: 1rpx solid var(--border); }
+.ps-time-val.ps-off { color: var(--tertiary); }
+.ps-kpa {
+  flex: 1; min-width: 0; height: 68rpx;
+  background: var(--input-bg); border: none; border-radius: var(--radius-sm);
+  padding: 0 14rpx; font-size: 26rpx; color: var(--label); box-sizing: border-box; text-align: left;
+}
+.app.dark .ps-kpa { border: 1rpx solid var(--border); font-family: var(--font-mono); }
+.ps-unit { font-size: 22rpx; color: var(--tertiary); flex-shrink: 0; }
+.ps-sw { transform: scale(0.68); flex-shrink: 0; }
 
 .ctrl-group {
   background: var(--ctrl-bg);
@@ -1425,6 +1879,7 @@ createPage({
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 100;   /* 置于最上层：否则同层渲染的原生 input 会浮在半透明 tabbar 之上，抢走「历史」等按钮的点击 */
   height: 100rpx;
   background: var(--tabbar-bg);
   backdrop-filter: blur(20rpx);
