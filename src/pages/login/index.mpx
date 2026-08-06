@@ -1,0 +1,101 @@
+<template>
+  <view class="page {{darkMode ? 'dark' : ''}}">
+    <view class="header">
+      <text class="title">设备管理</text>
+      <text class="subtitle">请使用租户端账号登录</text>
+    </view>
+
+    <view class="card">
+      <view class="field-group">
+        <view class="field-label">用户名</view>
+        <input class="field-input" model:value="{{username}}" placeholder="请输入用户名" placeholder-class="field-placeholder" />
+      </view>
+
+      <view class="field-group">
+        <view class="field-label">密码</view>
+        <input class="field-input" model:value="{{password}}" password placeholder="请输入密码" placeholder-class="field-placeholder" />
+      </view>
+
+      <button class="btn-primary btn-block" style="margin-top:32rpx" loading="{{loading}}" disabled="{{loading}}" bindtap="handleLogin">登录</button>
+
+      <text class="error" wx:if="{{errorMsg}}">{{errorMsg}}</text>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useAuthStore } from '../../stores/auth'
+import { useDeviceStore } from '../../stores/device'
+
+createPage({
+  data: { username: '', password: '', loading: false, errorMsg: '', darkMode: false },
+
+  onShow() {
+    this.setData({ darkMode: useDeviceStore().darkMode })
+  },
+
+  async handleLogin() {
+    // 已在请求中时直接忽略，避免连点发出两次登录
+    if (this.data.loading) return
+
+    const username = (this.data.username || '').trim()
+    const password = this.data.password || ''
+    if (!username || !password) {
+      this.setData({ errorMsg: '请输入用户名和密码' })
+      return
+    }
+
+    this.setData({ loading: true, errorMsg: '' })
+    try {
+      await useAuthStore().login(username, password)
+      // redirectTo 而不是 navigateTo：登录页不该留在返回栈里，
+      // 否则用户在首页点返回会退回一个已经登录过的登录页。
+      wx.redirectTo({ url: '/pages/index/index' })
+    } catch (err) {
+      // 后端的文案已经足够具体（用户不存在 / 密码错误 / 租户已被禁用），原样展示
+      this.setData({ errorMsg: err.message || '登录失败' })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 120rpx 32rpx 16rpx; min-height: 100vh; }
+
+.header { text-align: center; margin-bottom: 60rpx; }
+.title {
+  display: block; font-size: 48rpx; font-weight: 600;
+  color: var(--color-text);
+}
+.subtitle {
+  display: block; margin-top: 16rpx;
+  font-size: 26rpx; color: var(--color-text-secondary);
+}
+
+.field-group { margin-bottom: 24rpx; }
+.field-group:last-of-type { margin-bottom: 0; }
+.field-label {
+  font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
+  margin-bottom: 8rpx;
+}
+.field-input {
+  height: 80rpx; padding: 0 20rpx; box-sizing: border-box;
+  border: 2rpx solid var(--color-border); border-radius: var(--radius);
+  background: var(--color-card); font-size: 28rpx; color: var(--color-text);
+}
+.field-placeholder { color: var(--color-text-secondary); }
+
+.btn-block { width: 100%; }
+
+.error {
+  display: block; margin-top: 24rpx; text-align: center;
+  font-size: 26rpx; color: var(--color-danger);
+}
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "登录" }
+</script>

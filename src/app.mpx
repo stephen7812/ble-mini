@@ -1,11 +1,15 @@
 <script>
 import { createApp } from '@mpxjs/core'
 import { createPinia } from '@mpxjs/pinia'
+import { useAuthStore } from './stores/auth'
 import { useDeviceStore } from './stores/device'
 
 createApp({
   onLaunch() {
     createPinia()
+    // 顺序要紧：先恢复登录态再让首页 onShow 去读 isLogged，
+    // 反过来会让首页在第一帧把已登录的人当成未登录。
+    useAuthStore().loadAuth()
     const store = useDeviceStore()
     store.loadDevices()
     store.loadDarkMode()
@@ -117,6 +121,7 @@ page {
 {
   "pages": [
     "./pages/index/index",
+    "./pages/login/index",
     "./pages/scan/index",
     "./pages/control/index",
     "./pages/device-info/index",
