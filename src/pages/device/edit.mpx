@@ -1,0 +1,341 @@
+<template>
+  <view class="page {{darkMode ? 'dark' : ''}}">
+    <view class="card">
+      <view class="row"><text class="label">设备编号</text><text class="value">{{form.sn}}</text></view>
+      <view class="row">
+        <text class="label">设备名称</text>
+        <input class="input" value="{{form.name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onNameInput" />
+      </view>
+      <view class="row">
+        <text class="label">所属小区</text>
+        <picker
+          class="picker"
+          range="{{communityNames}}"
+          value="{{communityIndex}}"
+          bindchange="onCommunityChange"
+        >
+          <text class="value">{{communityNames[communityIndex] || '请选择'}}</text>
+        </picker>
+      </view>
+      <view class="row"><text class="label">省市区</text><text class="value muted">{{regionText || '选择小区后自动带出'}}</text></view>
+      <view class="row">
+        <text class="label">详细地址</text>
+        <input class="input" value="{{form.address}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onAddressInput" />
+      </view>
+      <view class="row"><text class="label">经纬度</text><text class="value muted">{{coordText}}</text></view>
+      <view class="hint">省市区与经纬度取自所属小区，需要修改请到网页端的小区管理页</view>
+    </view>
+
+    <view class="card">
+      <view class="card-title">安装信息</view>
+      <view class="row">
+        <text class="label">安装人</text>
+        <input class="input" value="{{form.installer_name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onInstallerInput" />
+      </view>
+      <view class="row">
+        <text class="label">安装日期</text>
+        <picker mode="date" value="{{installDate}}" bindchange="onDateChange">
+          <text class="value">{{installDate || '请选择'}}</text>
+        </picker>
+      </view>
+      <view class="row">
+        <text class="label">备注</text>
+        <input class="input" value="{{form.remark}}" placeholder="选填" placeholder-class="input-placeholder" bindinput="onRemarkInput" />
+      </view>
+      <view class="photos">
+        <view class="photo-wrap" wx:for="{{form.install_photos}}" wx:key="*this">
+          <image class="photo" src="{{item}}" mode="aspectFill" data-url="{{item}}" bindtap="previewPhoto" />
+          <text class="photo-del" data-url="{{item}}" bindtap="removePhoto">×</text>
+        </view>
+        <view class="photo-add" wx:if="{{form.install_photos.length < 6}}" bindtap="choosePhoto">+</view>
+      </view>
+    </view>
+
+    <view class="actions">
+      <button class="btn-primary btn-block" loading="{{saving}}" disabled="{{saving}}" bindtap="handleSave">保存</button>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { getCommunityOptions, getDeviceBySn, updateDevice, uploadImage } from '../../services/api/tenant'
+import { useAuthStore } from '../../stores/auth'
+import { useDeviceStore } from '../../stores/device'
+
+const MAX_PHOTOS = 6
+
+createPage({
+  data: {
+    sn: '',
+    saving: false,
+    darkMode: false,
+    communities: [],
+    communityNames: [],
+    communityIndex: -1,
+    installDate: '',
+    regionText: '',
+    coordText: '未填写',
+    form: {
+      id: 0,
+      sn: '',
+      name: '',
+      community_id: null,
+      province: '',
+      city: '',
+      district: '',
+      address: '',
+      longitude: null,
+      latitude: null,
+      remark: '',
+      installer_name: '',
+      install_time: null,
+      install_photos: [],
+    },
+  },
+
+  onLoad(query) {
+    this.setData({ sn: decodeURIComponent(query.sn || ''), darkMode: useDeviceStore().darkMode })
+    // 进页面先挡一道，避免用户从历史栈直接回到这一页绕过入口判定
+    if (!useAuthStore().canInstall) {
+      wx.showModal({
+        title: '账户暂无操作权限',
+        content: '你的账户还没有分配设备安装权限，请联系管理员开通。',
+        showCancel: false,
+        confirmText: '知道了',
+        success: () => wx.navigateBack(),
+      })
+      return
+    }
+    this.init()
+  },
+
+  async init() {
+    try {
+      const [device, communityRes] = await Promise.all([getDeviceBySn(this.data.sn), getCommunityOptions()])
+      const communities = (communityRes && communityRes.list) || []
+
+      const form = {
+        id: device.id,
+        sn: device.sn,
+        name: device.name || '',
+        community_id: device.community_id || null,
+        province: device.province || '',
+        city: device.city || '',
+        district: device.district || '',
+        address: device.address || '',
+        longitude: device.longitude === undefined ? null : device.longitude,
+        latitude: device.latitude === undefined ? null : device.latitude,
+        remark: device.remark || '',
+        // realname 在 auth store 里已经兜底成用户名，这里不用再判一次空
+        installer_name: device.installer_name || useAuthStore().user.realname,
+        install_time: device.install_time || null,
+        install_photos: device.install_photos || [],
+      }
+
+      this.setData({
+        communities,
+        communityNames: communities.map(c => c.name),
+        communityIndex: communities.findIndex(c => c.id === form.community_id),
+        form,
+        installDate: form.install_time ? this.toDateStr(form.install_time) : '',
+      })
+      this.refreshDerived()
+    } catch (err) {
+      wx.showModal({
+        title: '加载失败',
+        content: err.message || '请稍后重试',
+        showCancel: false,
+        success: () => wx.navigateBack(),
+      })
+    }
+  },
+
+  /**
+   * 表单字段统一走这里改。
+   *
+   * 不用 this.setData({ 'form.name': x }) 的路径写法：整份 form 每次都是新对象，
+   * 视图更新的时机只有一种，省得为「某个字段改了视图没动」去排查路径拼写。
+   */
+  patchForm(patch) {
+    this.setData({ form: { ...this.data.form, ...patch } })
+  },
+
+  /** 省市区与坐标是派生展示，任何改动小区的操作后都要重算 */
+  refreshDerived() {
+    const form = this.data.form
+    this.setData({
+      regionText: [form.province, form.city, form.district].filter(Boolean).join(' / '),
+      coordText:
+        form.longitude === null || form.latitude === null
+          ? '未填写'
+          : `${form.longitude}, ${form.latitude}`,
+    })
+  },
+
+  toDateStr(seconds) {
+    const d = new Date(seconds * 1000)
+    const p = n => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  },
+
+  onNameInput(e) {
+    this.patchForm({ name: e.detail.value })
+  },
+  onAddressInput(e) {
+    this.patchForm({ address: e.detail.value })
+  },
+  onInstallerInput(e) {
+    this.patchForm({ installer_name: e.detail.value })
+  },
+  onRemarkInput(e) {
+    this.patchForm({ remark: e.detail.value })
+  },
+
+  /**
+   * 选中小区后把小区的省市区、地址与中心点带进来。
+   * 与网页端 handleCommunityChange 的规则逐条对齐：小区没填中心点时不覆盖已有坐标，
+   * 拿 null 去盖掉一个已知坐标是纯粹的损失。
+   */
+  onCommunityChange(e) {
+    const index = Number(e.detail.value)
+    const c = this.data.communities[index]
+    if (!c) return
+    const patch = {
+      community_id: c.id,
+      province: c.province || '',
+      city: c.city || '',
+      district: c.district || '',
+      address: c.address || '',
+    }
+    if (c.longitude !== null && c.longitude !== undefined && c.latitude !== null && c.latitude !== undefined) {
+      patch.longitude = c.longitude
+      patch.latitude = c.latitude
+    }
+    this.setData({ communityIndex: index })
+    this.patchForm(patch)
+    this.refreshDerived()
+  },
+
+  /**
+   * 只取到日的精度。安装人员回填的是「哪天装的」，让他在手机上拨到分钟
+   * 只会拨出一个假精确的时间。存的时候补成当天 00:00。
+   */
+  onDateChange(e) {
+    const date = e.detail.value
+    this.setData({ installDate: date })
+    // iOS 解析不了 '2026-08-06 00:00:00' 这种带空格的格式，用 / 分隔才是全平台都认的写法
+    this.patchForm({ install_time: Math.floor(new Date(`${date.replace(/-/g, '/')} 00:00:00`).getTime() / 1000) })
+  },
+
+  previewPhoto(e) {
+    wx.previewImage({ current: e.currentTarget.dataset.url, urls: this.data.form.install_photos })
+  },
+
+  removePhoto(e) {
+    const url = e.currentTarget.dataset.url
+    // 只从表单摘掉，不删服务器文件：用户可能还会取消保存
+    this.patchForm({ install_photos: this.data.form.install_photos.filter(u => u !== url) })
+  },
+
+  async choosePhoto() {
+    const remain = MAX_PHOTOS - this.data.form.install_photos.length
+    let files = []
+    try {
+      const res = await new Promise((resolve, reject) => {
+        wx.chooseMedia({ count: remain, mediaType: ['image'], success: resolve, fail: reject })
+      })
+      files = res.tempFiles || []
+    } catch (e) {
+      return // 用户取消
+    }
+
+    wx.showLoading({ title: '上传中' })
+    try {
+      // 串行上传：安装现场网络普遍不好，并发几张更容易整批超时，
+      // 而且串行能在中途失败时保住已经传上去的那几张。
+      for (const f of files) {
+        const url = await uploadImage(f.tempFilePath)
+        this.patchForm({ install_photos: [...this.data.form.install_photos, url] })
+      }
+      wx.hideLoading()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showModal({ title: '上传失败', content: err.message || '请重试', showCancel: false })
+    }
+  },
+
+  async handleSave() {
+    if (this.data.saving) return
+    this.setData({ saving: true })
+    const form = this.data.form
+    try {
+      // 逐字段列出，与后端白名单 DEVICE_EDITABLE_FIELDS 对齐。
+      // 直接展开 this.data.form 会把 sn 一起送过去，那是设备身份，后端不收。
+      await updateDevice({
+        id: form.id,
+        name: form.name,
+        community_id: form.community_id,
+        province: form.province,
+        city: form.city,
+        district: form.district,
+        address: form.address,
+        longitude: form.longitude,
+        latitude: form.latitude,
+        remark: form.remark,
+        installer_name: form.installer_name,
+        install_time: form.install_time,
+        install_photos: form.install_photos,
+      })
+      wx.showToast({ title: '保存成功', icon: 'success' })
+      // 详情页的 onShow 会重新拉一次，所以这里不用回传数据
+      setTimeout(() => wx.navigateBack(), 800)
+    } catch (err) {
+      wx.showModal({ title: '保存失败', content: err.message || '请稍后重试', showCancel: false })
+    } finally {
+      this.setData({ saving: false })
+    }
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; min-height: 100vh; }
+
+.card-title {
+  padding: 4rpx 0 12rpx;
+  font-size: 30rpx; font-weight: 600; color: var(--color-text);
+}
+
+.row { display: flex; align-items: center; padding: 16rpx 0; }
+.label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); }
+.value { flex: 1; font-size: 28rpx; color: var(--color-text); word-break: break-all; }
+.value.muted { color: var(--color-text-secondary); }
+
+.input { flex: 1; font-size: 28rpx; color: var(--color-text); }
+.input-placeholder { color: var(--color-text-secondary); font-size: 26rpx; }
+.picker { flex: 1; }
+
+.hint { padding: 8rpx 0 4rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+
+.photos { display: flex; flex-wrap: wrap; padding: 8rpx 0 4rpx; }
+.photo-wrap { position: relative; margin: 0 16rpx 16rpx 0; }
+.photo { width: 180rpx; height: 180rpx; border-radius: var(--radius); }
+.photo-del {
+  position: absolute; top: -10rpx; right: -10rpx;
+  width: 40rpx; height: 40rpx; line-height: 36rpx; text-align: center;
+  border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; font-size: 30rpx;
+}
+.photo-add {
+  width: 180rpx; height: 180rpx; line-height: 180rpx; text-align: center;
+  border: 2rpx dashed var(--color-border); border-radius: var(--radius);
+  color: var(--color-text-secondary); font-size: 60rpx;
+}
+
+.actions { padding: 16rpx; }
+.btn-block { width: 100%; box-sizing: border-box; }
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "编辑设备" }
+</script>

@@ -123,6 +123,7 @@ page {
     "./pages/index/index",
     "./pages/login/index",
     "./pages/device/detail",
+    "./pages/device/edit",
     "./pages/ble/prepare",
     "./pages/scan/index",
     "./pages/control/index",
