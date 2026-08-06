@@ -1,0 +1,170 @@
+<template>
+  <view class="page {{darkMode ? 'dark' : ''}}">
+    <view class="loading" wx:if="{{loading}}">加载中…</view>
+
+    <block wx:else>
+      <view class="card">
+        <view class="row"><text class="label">设备编号</text><text class="value">{{device.sn}}</text></view>
+        <view class="row"><text class="label">设备名称</text><text class="value">{{device.name || '-'}}</text></view>
+        <view class="row"><text class="label">所属小区</text><text class="value">{{device.community_name || '-'}}</text></view>
+        <view class="row"><text class="label">省市区</text><text class="value">{{regionText || '-'}}</text></view>
+        <view class="row"><text class="label">详细地址</text><text class="value">{{device.address || '-'}}</text></view>
+        <view class="row"><text class="label">经纬度</text><text class="value">{{coordText}}</text></view>
+        <view class="row"><text class="label">备注</text><text class="value">{{device.remark || '-'}}</text></view>
+      </view>
+
+      <view class="card">
+        <view class="card-title">安装信息</view>
+        <view class="row"><text class="label">安装人</text><text class="value">{{device.installer_name || '未填写'}}</text></view>
+        <view class="row"><text class="label">安装时间</text><text class="value">{{installTimeText}}</text></view>
+        <view class="row"><text class="label">现场照片</text><text class="value">{{photoCountText}}</text></view>
+        <view class="photos" wx:if="{{device.install_photos.length > 0}}">
+          <image
+            wx:for="{{device.install_photos}}"
+            wx:key="*this"
+            class="photo"
+            src="{{item}}"
+            mode="aspectFill"
+            data-url="{{item}}"
+            bindtap="previewPhoto"
+          />
+        </view>
+      </view>
+
+      <view class="actions">
+        <button class="btn-primary btn-block" wx:if="{{canInstall}}" bindtap="goEdit">编辑安装信息</button>
+        <!--
+          有 debugger 才出现。没有这个角色的人这里不该有任何通往调试的出口 ——
+          规格 §5.3 第 4 条是专门验这一点的。
+        -->
+        <button class="btn-outline btn-block" wx:if="{{canDebug}}" bindtap="goDebug">蓝牙调试</button>
+        <text class="tip" wx:if="{{!canInstall}}">当前账号没有设备安装权限，仅可查看</text>
+      </view>
+    </block>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useAuthStore } from '../../stores/auth'
+import { useDeviceStore } from '../../stores/device'
+import { getDeviceBySn } from '../../services/api/tenant'
+
+createPage({
+  data: {
+    sn: '',
+    loading: true,
+    canInstall: false,
+    canDebug: false,
+    darkMode: false,
+    device: { install_photos: [] },
+    regionText: '',
+    coordText: '-',
+    installTimeText: '未填写',
+    photoCountText: '无',
+  },
+
+  onLoad(query) {
+    this.setData({ sn: decodeURIComponent(query.sn || '') })
+  },
+
+  /**
+   * 每次显示都重新拉一次，而不是只在 onLoad 拉。
+   * 编辑页保存后是 navigateBack 回到这里的，不重拉就会显示改之前的数据。
+   */
+  onShow() {
+    const auth = useAuthStore()
+    this.setData({
+      darkMode: useDeviceStore().darkMode,
+      canInstall: auth.canInstall,
+      canDebug: auth.canDebug,
+    })
+    this.loadDevice()
+  },
+
+  async loadDevice() {
+    if (!this.data.sn) {
+      this.setData({ loading: false })
+      return
+    }
+    this.setData({ loading: true })
+    try {
+      const device = await getDeviceBySn(this.data.sn)
+      device.install_photos = device.install_photos || []
+      this.setData({
+        device,
+        regionText: [device.province, device.city, device.district].filter(Boolean).join(' / '),
+        coordText:
+          device.longitude === null || device.latitude === null || device.longitude === undefined || device.latitude === undefined
+            ? '未填写'
+            : `${device.longitude}, ${device.latitude}`,
+        installTimeText: device.install_time ? this.formatTime(device.install_time) : '未填写',
+        photoCountText: device.install_photos.length ? `${device.install_photos.length} 张` : '无',
+      })
+    } catch (err) {
+      // 这里不做三态分文案：能走到详情页说明扫码时查得到，此刻查不到基本是网络或登录态问题，
+      // 后端原文案已经够用，直接透传并退回上一页。
+      wx.showModal({
+        title: '加载失败',
+        content: err.message || '请稍后重试',
+        showCancel: false,
+        success: () => wx.navigateBack(),
+      })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  /** 后端存的是秒级时间戳，小程序的 Date 要毫秒 */
+  formatTime(seconds) {
+    const d = new Date(seconds * 1000)
+    const p = n => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  },
+
+  previewPhoto(e) {
+    wx.previewImage({ current: e.currentTarget.dataset.url, urls: this.data.device.install_photos })
+  },
+
+  goEdit() {
+    wx.navigateTo({ url: `/pages/device/edit?sn=${encodeURIComponent(this.data.sn)}` })
+  },
+
+  goDebug() {
+    wx.navigateTo({ url: '/pages/ble/prepare' })
+  },
+})
+</script>
+
+<style scoped>
+.page { padding: 16rpx; min-height: 100vh; }
+
+.loading {
+  padding: 120rpx 0; text-align: center;
+  font-size: 28rpx; color: var(--color-text-secondary);
+}
+
+.card-title {
+  padding: 4rpx 0 12rpx;
+  font-size: 30rpx; font-weight: 600; color: var(--color-text);
+}
+
+.row { display: flex; align-items: flex-start; padding: 16rpx 0; }
+.label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); }
+.value { flex: 1; font-size: 28rpx; color: var(--color-text); word-break: break-all; }
+
+.photos { display: flex; flex-wrap: wrap; padding-top: 8rpx; }
+.photo { width: 200rpx; height: 200rpx; margin: 0 16rpx 16rpx 0; border-radius: var(--radius); }
+
+.actions { padding: 16rpx; }
+.btn-block { width: 100%; box-sizing: border-box; margin-bottom: 16rpx; }
+
+.tip {
+  display: block; padding: 16rpx 0; text-align: center;
+  font-size: 26rpx; color: var(--color-text-secondary);
+}
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "设备详情" }
+</script>
