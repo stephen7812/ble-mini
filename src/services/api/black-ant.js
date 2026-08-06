@@ -1,6 +1,10 @@
 import { buildHeaders } from './auth'
+import { API_BASE_URL } from '../../config/index'
 
-const BASE_URL = ''
+// 原来是空串（同域相对路径）。小程序的 wx.request 不接受相对地址，那等于这几个
+// 接口一直是死的。现在统一从配置读，避免两套地址来源。
+// 注意：/api/v1/data/** 是黑蚂蚁云的原始路径，需要 js-api 侧提供同名转发才通。
+const BASE_URL = API_BASE_URL
 
 export function getRealtimeData(nodeId, appId, appKey) {
   return new Promise((resolve, reject) => {

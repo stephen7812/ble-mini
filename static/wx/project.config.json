@@ -1,7 +1,7 @@
 {
   "setting": {
     "newFeature": true,
-    "urlCheck": true,
+    "urlCheck": false,
     "es6": false,
     "postcss": true,
     "minified": false,
