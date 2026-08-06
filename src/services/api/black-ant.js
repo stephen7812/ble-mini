@@ -5,7 +5,7 @@ const BASE_URL = ''
 export function getRealtimeData(nodeId, appId, appKey) {
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${BASE_URL}/api/v1/data/Vx/getRealtime`,
+      url: `${BASE_URL}/api/v1/data/Dx/getRealtime`,
       method: 'GET',
       header: buildHeaders(appId, appKey),
       data: { page: 1, pageSize: -1, projectId: appId },
