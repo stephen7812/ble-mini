@@ -122,6 +122,7 @@ page {
   "pages": [
     "./pages/index/index",
     "./pages/login/index",
+    "./pages/ble/prepare",
     "./pages/scan/index",
     "./pages/control/index",
     "./pages/device-info/index",

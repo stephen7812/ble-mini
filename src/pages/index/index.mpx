@@ -1,134 +1,247 @@
 <template>
   <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">连接设备</view>
-
-    <view class="card">
-      <view class="field-group">
-        <view class="field-label">设备编号</view>
-        <view class="input-row">
-          <input class="field-input" model:value="{{deviceCode}}" placeholder="扫码或输入设备编号" placeholder-class="field-placeholder" />
-          <button class="btn-primary btn-scan-icon" bindtap="scanCode">⊞</button>
-        </view>
-      </view>
-
-      <view class="field-group">
-        <view class="field-label">阀门类型</view>
-        <view class="sel-grid">
-          <view class="sel-option {{valveTypeIndex === 0 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="0">
-            <text class="sel-name">先导调节阀</text>
-            <text class="sel-desc">压力型</text>
-          </view>
-          <view class="sel-option {{valveTypeIndex === 1 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="1">
-            <text class="sel-name">智能调节阀</text>
-            <text class="sel-desc">开度型</text>
-          </view>
-        </view>
-      </view>
-
-      <view class="field-group">
-        <view class="field-label">控制模式</view>
-        <view class="sel-grid">
-          <view class="sel-option {{modeIndex === 0 ? 'sel-active' : ''}}" bindtap="setMode" data-index="0">
-            <text class="sel-name">蓝牙广播</text>
-            <text class="sel-desc">通过 BLE 广播信号控制</text>
-          </view>
-          <view class="sel-option {{modeIndex === 1 ? 'sel-active' : ''}}" bindtap="setMode" data-index="1">
-            <text class="sel-name">4G/WiFi</text>
-            <text class="sel-desc">通过网络远程控制</text>
-          </view>
-        </view>
-      </view>
-
-      <button class="btn-primary btn-block" style="margin-top:24rpx" bindtap="goControl">确定</button>
+    <view class="card user-bar" wx:if="{{isLogged}}">
+      <text class="username">{{username}}</text>
+      <text class="tenant">{{tenantName}}</text>
+      <text class="logout" bindtap="handleLogout">退出</text>
     </view>
 
-    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">
-      <text>连接记录</text>
-      <text class="text-sm text-secondary" wx:if="{{pairedDevices.length > 0}}" bindtap="clearHistory" style="padding:8rpx 16rpx">清除</text>
+    <view class="card entry" bindtap="handleScan">
+      <text class="entry-title">设备信息维护</text>
+      <text class="entry-desc">扫描设备二维码，查看并补充安装信息</text>
+    </view>
+    <view class="card entry" bindtap="handleDebug">
+      <text class="entry-title">设备蓝牙调试</text>
+      <text class="entry-desc">连接附近设备，读取与下发参数</text>
     </view>
 
-    <view wx:if="{{pairedDevices.length === 0}}" class="history-empty">暂无连接记录</view>
-
-    <block wx:for="{{pairedDevices}}" wx:key="deviceId">
-      <view class="card history-item" bindtap="goControlWithDevice" data-device="{{item}}">
-        <view class="history-dot dot-on"></view>
-        <view class="history-info">
-          <view class="history-top">
-            <text class="history-name">{{item.localName || item.deviceId}}</text>
-            <text class="history-tag">{{item.valveType || '智能调节阀'}}</text>
-          </view>
-        </view>
-        <text class="history-time">{{item.lastSeenText}}</text>
-      </view>
-    </block>
-
-    <view class="theme-toggle" bindtap="toggleTheme">{{darkMode ? '🌙' : '☀️'}}</view>
+    <!--
+      主题开关放在流式布局的末尾而不是像蓝牙页那样绝对定位到右上角：
+      首页右上角已经被「退出」占了，绝对定位会压在它上面点不中。
+    -->
+    <view class="theme-row" bindtap="toggleTheme">
+      <text class="theme-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+      <text class="theme-text">{{darkMode ? '深色模式' : '浅色模式'}}</text>
+    </view>
   </view>
 </template>
 
 <script>
 import { createPage } from '@mpxjs/core'
+import { useAuthStore } from '../../stores/auth'
 import { useDeviceStore } from '../../stores/device'
-import { formatTime } from '../../utils/convert'
+import { getDeviceBySn } from '../../services/api/tenant'
 
-const valveTypes = ['先导调节阀（压力型）', '智能调节阀（开度型）']
-const valveTypeIds = ['new', 'old']
-const modes = ['蓝牙广播', '4G/WiFi']
-const modeIds = ['broadcast', 'bluetooth']
+/**
+ * 扫码失败时的场景化文案表，逐条对应规格 §3.9.2。
+ *
+ * 做成一张表而不是一串 if：每种失败都要按「有没有 debugger」给两套说法，
+ * 写成分支就是十个嵌套 if，改一句话得在两处同时改。
+ *
+ * 三处措辞是刻意的，不要「顺手统一」：
+ * - 「未建档」而不是「不存在」—— 设备就在他手里，说不存在会让他反复重扫。
+ * - 「其他单位」而不是「其他租户」——「租户」是系统内部词，现场人员不认。
+ * - 未分配那条必须点名「联系管理员完成分配」—— 它要运营去做分配动作，
+ *   和「归属他人」需要人工核对归属是两拨人的活，给同一句话会把活派错。
+ */
+const SCAN_FEEDBACK = {
+  notFound: {
+    title: '设备未建档',
+    withDebug: '该设备尚未录入系统，无法查看或维护信息。可以先进行蓝牙调试。',
+    withoutDebug: '该设备尚未录入系统，请联系管理员录入后再操作。',
+  },
+  mismatch: {
+    title: '设备不属于当前账户',
+    withDebug: '该设备已归属其他单位，你的账户无法查看它的信息。可以先进行蓝牙调试。',
+    withoutDebug: '该设备已归属其他单位。若确认归属有误，请联系管理员处理。',
+  },
+  unassigned: {
+    title: '设备尚未分配',
+    withDebug: '该设备已入库但还没有分配给任何单位，请联系管理员完成分配。可以先进行蓝牙调试。',
+    withoutDebug: '该设备已入库但还没有分配给任何单位，请联系管理员完成分配。',
+  },
+  network: {
+    title: '网络不可用',
+    withDebug: '当前连不上服务器，设备信息暂时查不了。蓝牙调试不需要网络，可以正常使用。',
+    withoutDebug: '当前连不上服务器，请检查网络后重试。',
+    // 网络失败是唯一「再试一次可能就好了」的场景，所以它的次要按钮是重试而不是取消
+    retry: true,
+  },
+}
+
+/**
+ * 后端的 403 有两种含义，靠文案区分——状态码本身分不出「归属他人」和「未分配」。
+ * 这是 by-sn 三态设计的直接后果，别在这里图省事合并成一句。
+ */
+function classifyError(err) {
+  if (err.code === 404) return 'notFound'
+  if (err.code === 403) return err.message && err.message.indexOf('未分配') >= 0 ? 'unassigned' : 'mismatch'
+  return 'network'
+}
 
 createPage({
-  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 1, valveTypes, modeIndex: 0, modes, darkMode: false },
-  onShow() {
-    const store = useDeviceStore()
-    this.setData({ darkMode: store.darkMode })
-    this.formatDevices()
+  data: {
+    isLogged: false,
+    username: '',
+    tenantName: '',
+    darkMode: false,
   },
+
+  onShow() {
+    const auth = useAuthStore()
+    this.setData({
+      darkMode: useDeviceStore().darkMode,
+      isLogged: auth.isLogged,
+      username: auth.user.username,
+      tenantName: auth.tenant.name,
+    })
+
+    // 登录了却一个角色都没有：两个入口都点不动，与其让他挨个点出两次拒绝，
+    // 不如一进首页就说清楚该找谁。
+    if (auth.isLogged && !auth.canInstall && !auth.canDebug) {
+      wx.showModal({
+        title: '账户暂无操作权限',
+        content: '你的账户还没有分配设备安装或蓝牙调试权限，请联系管理员开通。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+    }
+  },
+
   toggleTheme() {
     const store = useDeviceStore()
     store.toggleDarkMode()
     this.setData({ darkMode: store.darkMode })
   },
-  formatDevices() {
-    const store = useDeviceStore()
-    this.setData({
-      pairedDevices: (store.pairedDevices || []).slice(0, 5).map(d => ({ ...d, lastSeenText: formatTime(d.lastSeen) })),
-    })
-  },
-  scanCode() {
-    const that = this
-    wx.scanCode({
-      success(res) {
-        const code = (res.result || '').trim()
-        that.setData({ deviceCode: code })
-        wx.showToast({ title: '已获取设备编号', icon: 'success' })
-      },
-      fail(err) { if (err.errCode !== -1) wx.showToast({ title: '扫码失败', icon: 'none' }) },
-    })
-  },
-  goControl() {
-    const code = this.data.deviceCode.trim()
-    if (!code) { wx.showToast({ title: '请扫码或输入设备编号', icon: 'none' }); return }
-    const idx = this.data.valveTypeIndex
-    const mode = modeIds[this.data.modeIndex]
-    const device = {
-      deviceId: code, localName: code,
-      valveType: valveTypes[idx], valveTypeId: valveTypeIds[idx],
-      mode,
-    }
-    useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/broadcast/index' })
-  },
-  goControlWithDevice(e) {
-    const device = e.currentTarget.dataset.device
-    useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/broadcast/index' })
-  },
-  setValveType(e) { this.setData({ valveTypeIndex: Number(e.currentTarget.dataset.index) }) },
-  setMode(e) { this.setData({ modeIndex: Number(e.currentTarget.dataset.index) }) },
-  clearHistory() {
+
+  /** 未登录时统一在这里拦并跳登录，两个入口共用 */
+  requireLogin() {
+    if (useAuthStore().isLogged) return true
     wx.showModal({
-      title: '确认清除', content: '确定清除所有连接记录？',
-      success: (res) => { if (res.confirm) { useDeviceStore().clearHistory(); this.formatDevices() } },
+      title: '需要登录',
+      content: '查看设备信息和使用蓝牙调试都需要先登录。',
+      confirmText: '去登录',
+      success: (res) => {
+        if (res.confirm) wx.navigateTo({ url: '/pages/login/index' })
+      },
+    })
+    return false
+  },
+
+  /**
+   * 扫码失败的统一出口。
+   *
+   * 降级到蓝牙调试是「用户点按钮」而不是自动跳转：自动跳会让人根本没看清
+   * 提示就已经换了页面，下次遇到同样问题照样懵。
+   */
+  showScanFeedback(kind, onRetry) {
+    const canDebug = useAuthStore().canDebug
+    const f = SCAN_FEEDBACK[kind]
+
+    if (canDebug) {
+      wx.showModal({
+        title: f.title,
+        content: f.withDebug,
+        confirmText: '蓝牙调试',
+        cancelText: f.retry ? '重试' : '取消',
+        success: (res) => {
+          if (res.confirm) wx.navigateTo({ url: '/pages/ble/prepare' })
+          else if (f.retry && onRetry) onRetry()
+        },
+      })
+      return
+    }
+
+    if (f.retry) {
+      wx.showModal({
+        title: f.title,
+        content: f.withoutDebug,
+        confirmText: '重试',
+        success: (res) => {
+          if (res.confirm && onRetry) onRetry()
+        },
+      })
+      return
+    }
+
+    wx.showModal({ title: f.title, content: f.withoutDebug, showCancel: false, confirmText: '知道了' })
+  },
+
+  async handleScan() {
+    if (!this.requireLogin()) return
+    if (!useAuthStore().canInstall) {
+      wx.showModal({
+        title: '账户暂无操作权限',
+        content: '你的账户还没有分配设备安装权限，请联系管理员开通。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+
+    let sn = ''
+    try {
+      const res = await new Promise((resolve, reject) => {
+        wx.scanCode({ onlyFromCamera: false, success: resolve, fail: reject })
+      })
+      sn = (res.result || '').trim()
+    } catch (e) {
+      // 用户主动取消也会走 fail，不该当错误弹窗
+      return
+    }
+
+    if (!sn) {
+      wx.showModal({ title: '识别失败', content: '未能识别二维码内容，请重新扫描。', showCancel: false })
+      return
+    }
+
+    this.lookupDevice(sn)
+  },
+
+  /** 抽成独立方法是为了让「重试」按钮能原样再调一次，不用把扫码也重来一遍 */
+  async lookupDevice(sn) {
+    wx.showLoading({ title: '查询中' })
+    try {
+      await getDeviceBySn(sn)
+      wx.hideLoading()
+      // 只把 sn 带过去，详情页自己再查一次：从扫码进和从别处进走同一条路径，
+      // 少一种「数据从哪来」的分支。
+      wx.navigateTo({ url: `/pages/device/detail?sn=${encodeURIComponent(sn)}` })
+    } catch (err) {
+      wx.hideLoading()
+      if (err.code === 401) {
+        // 续期也失败了，http 层已经清了本地登录态
+        wx.navigateTo({ url: '/pages/login/index' })
+        return
+      }
+      this.showScanFeedback(classifyError(err), () => this.lookupDevice(sn))
+    }
+  },
+
+  handleDebug() {
+    if (!this.requireLogin()) return
+    if (!useAuthStore().canDebug) {
+      wx.showModal({
+        title: '账户暂无操作权限',
+        content: '你的账户还没有分配蓝牙调试权限，请联系管理员开通。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+    wx.navigateTo({ url: '/pages/ble/prepare' })
+  },
+
+  handleLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '确定退出当前账号吗？',
+      success: (res) => {
+        if (!res.confirm) return
+        useAuthStore().logout()
+        // 复用 onShow 把用户条与角色提示刷新一遍，不用再写一份同样的赋值
+        this.onShow()
+      },
     })
   },
 })
@@ -137,67 +250,24 @@ createPage({
 <style scoped>
 .page { padding: 16rpx; min-height: 100vh; position: relative; }
 
-.section-title {
-  font-size: 28rpx; font-weight: 600;
-  display: flex; align-items: center; justify-content: space-between;
-}
-.page.dark .section-title { color: var(--color-text-secondary); }
+.user-bar { display: flex; align-items: center; }
+.username { font-size: 30rpx; font-weight: 600; color: var(--color-text); }
+.tenant { flex: 1; margin-left: 16rpx; font-size: 26rpx; color: var(--color-text-secondary); }
+.logout { font-size: 26rpx; color: var(--color-danger); padding: 8rpx 16rpx; }
 
-.field-group { margin-bottom: 24rpx; }
-.field-group:last-of-type { margin-bottom: 0; }
-.field-label {
-  font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
-  margin-bottom: 8rpx;
-}
-.input-row { display: flex; gap: 12rpx; }
-.field-input {
-  flex: 1; height: 72rpx;
-  border: 2rpx solid var(--color-border); border-radius: var(--radius);
-  padding: 0 16rpx; font-size: 26rpx; color: var(--color-text); box-sizing: border-box;
-}
-.field-placeholder { color: #ccc; font-size: 24rpx; }
-.btn-scan-icon { width: 72rpx; height: 72rpx; padding: 0; font-size: 32rpx; flex-shrink: 0; line-height: 72rpx; }
+.entry { padding: 40rpx 32rpx; }
+.entry:active { background: var(--color-bg); }
+.entry-title { display: block; font-size: 34rpx; font-weight: 600; color: var(--color-text); }
+.entry-desc { display: block; margin-top: 12rpx; font-size: 26rpx; color: var(--color-text-secondary); }
 
-.sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
-.sel-option {
-  display: flex; flex-direction: column; align-items: center; gap: 6rpx;
-  padding: 20rpx 12rpx;
-  border: 2rpx solid var(--color-border); border-radius: var(--radius);
-  background: transparent; text-align: center;
+.theme-row {
+  display: flex; align-items: center; justify-content: center; gap: 12rpx;
+  margin-top: 32rpx; padding: 20rpx;
 }
-.sel-option:active { background: var(--color-bg); }
-.sel-active { border-color: var(--color-primary); background: #e8faf0; }
-.page.dark .sel-active { background: rgba(0,255,65,0.08); }
-.sel-name { font-size: 26rpx; font-weight: 600; color: var(--color-text); }
-.sel-desc { font-size: 20rpx; color: var(--color-text-secondary); }
-
-.btn-block { width: 100%; box-sizing: border-box; }
-
-.history-empty {
-  text-align: center; padding: 64rpx 0; font-size: 26rpx; color: var(--color-text-secondary);
-}
-.history-item {
-  display: flex; align-items: center; gap: 14rpx;
-  margin: 0 0 12rpx 0; padding: 20rpx;
-}
-.history-item:active { background: var(--color-bg); }
-.history-dot { width: 10rpx; height: 10rpx; border-radius: 50%; flex-shrink: 0; }
-.dot-on { background: var(--color-success); }
-.dot-off { background: #ddd; }
-.history-info { flex: 1; min-width: 0; }
-.history-top { display: flex; align-items: center; gap: 8rpx; }
-.history-name { font-size: 28rpx; font-weight: 600; color: var(--color-text); }
-.history-tag { font-size: 20rpx; color: var(--color-primary); background: var(--color-bg); padding: 2rpx 10rpx; border-radius: 6rpx; }
-.history-time { font-size: 22rpx; color: var(--color-text-secondary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-
-.theme-toggle {
-  position: absolute; top: 24rpx; right: 24rpx; z-index: 10;
-  width: 64rpx; height: 64rpx; border-radius: 50%;
-  background: var(--color-card); box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
-  display: flex; align-items: center; justify-content: center; font-size: 32rpx;
-}
+.theme-icon { font-size: 32rpx; }
+.theme-text { font-size: 24rpx; color: var(--color-text-secondary); }
 </style>
 
 <script type="application/json">
-{ "navigationBarTitleText": "智能阀门" }
+{ "navigationBarTitleText": "设备管理" }
 </script>
