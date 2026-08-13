@@ -92,12 +92,17 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 16rpx; }
-.form-item { margin-bottom: 16rpx; }
-.form-label { font-size: 26rpx; color: var(--color-text); display: block; margin-bottom: 8rpx; }
-.form-input { width: 100%; height: 72rpx; border: 2rpx solid var(--color-border); border-radius: var(--radius); padding: 0 16rpx; font-size: 26rpx; box-sizing: border-box; }
-.action-row { display: flex; gap: 16rpx; }
+.page { padding: 24rpx 24rpx 48rpx; }
+.form-item { margin-bottom: 20rpx; }
+.form-label { font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary); display: block; margin-bottom: 12rpx; }
+.form-input {
+  width: 100%; height: 88rpx; border: 2rpx solid transparent; border-radius: 20rpx;
+  background: var(--color-fill); padding: 0 28rpx; font-size: 28rpx;
+  color: var(--color-text); box-sizing: border-box;
+}
+.action-row { display: flex; gap: 20rpx; }
 .action-row > button { flex: 1; }
+.action-row .btn-outline { padding: 22rpx 0; }
 </style>
 
 <script type="application/json">

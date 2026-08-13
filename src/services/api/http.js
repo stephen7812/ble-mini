@@ -123,7 +123,7 @@ export async function request(options, _retried = false) {
 }
 
 /** 上传走 wx.uploadFile，走不了 wx.request，所以单独开一个但共用 token 读取 */
-export function uploadImage(filePath) {
+export function uploadImage(filePath, sn) {
   const auth = readAuth()
   return new Promise((resolve, reject) => {
     wx.uploadFile({
@@ -131,6 +131,7 @@ export function uploadImage(filePath) {
       filePath,
       // 后端读的是 parseBody()['file']，字段名必须是 file
       name: 'file',
+      formData: sn ? { sn } : {},
       header: auth && auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
       success: (res) => {
         // uploadFile 的 data 是字符串，得自己解析
@@ -148,6 +149,43 @@ export function uploadImage(filePath) {
         resolve(body.data.url)
       },
       fail: () => reject(new Error('上传失败，请检查网络')),
+    })
+  })
+}
+
+/**
+ * 把后端返回的文件 URL 归一到当前 API 地址。
+ *
+ * 背景：install_photos 存的是上传时用 config.upload.baseUrl 拼的绝对 URL，
+ * 而 baseUrl 的兜底是硬编码的 http://jsapi.site —— 环境变量没配、或部署域名
+ * 变更后，库里旧 URL 的 host 就指向一个死地址，真机加载/下载全部失败。
+ * 文件本就由 API 服务器的 /upload/ 静态目录提供，所以展示和下载前把 origin
+ * 统一换成 API_BASE_URL 的 origin；只认 /upload/ 开头的自家路径，外链原样放行。
+ */
+export function normalizeFileUrl(url) {
+  if (!url) return url
+  if (url.charAt(0) === '/') return API_BASE_URL + url
+  const m = /^https?:\/\/[^/]+(\/upload\/.*)$/.exec(url)
+  if (m) return API_BASE_URL + m[1]
+  return url
+}
+
+/**
+ * 从服务端 URL 下载文件到本地临时路径。
+ * 解决真机预览时 <image> 组件无法直接加载 HTTP 图片的问题。
+ */
+export function downloadFile(url) {
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url: normalizeFileUrl(url),
+      success: (res) => {
+        if (res.statusCode === 200) {
+          resolve(res.tempFilePath)
+        } else {
+          reject(new Error('下载失败'))
+        }
+      },
+      fail: () => reject(new Error('下载失败，请检查网络')),
     })
   })
 }

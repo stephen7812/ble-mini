@@ -1,4 +1,4 @@
-import { request, uploadImage } from './http'
+import { request, uploadImage, downloadFile, normalizeFileUrl } from './http'
 
 /**
  * 租户登录。
@@ -28,7 +28,7 @@ export function getDeviceBySn(sn) {
 /**
  * 保存设备信息。需要调用者具备 installer 角色，
  * 否则后端返回 { code: 403, message: '无权编辑设备信息' }。
- * payload 必须带 id；install_time 是秒级时间戳，install_photos 是 URL 数组（最多 6 张）。
+ * payload 必须带 id；install_time 是秒级时间戳，install_photos 是 URL 数组（最多 3 张）。
  */
 export function updateDevice(payload) {
   return request({ url: '/tenant/device/update', method: 'POST', data: payload })
@@ -39,4 +39,12 @@ export function getCommunityOptions(keywords = '') {
   return request({ url: `/tenant/community/options?keywords=${encodeURIComponent(keywords)}`, method: 'GET' })
 }
 
-export { uploadImage }
+/**
+ * 按尾号搜索设备。返回列表，每项包含 id、sn、name、community 等字段。
+ * 用于首页手动输入设备尾号匹配的场景。
+ */
+export function searchDevices(keyword) {
+  return request({ url: `/tenant/device/list?keyword=${encodeURIComponent(keyword)}&page_size=20`, method: 'GET' })
+}
+
+export { uploadImage, downloadFile, normalizeFileUrl }

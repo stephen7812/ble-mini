@@ -1,27 +1,118 @@
 <template>
   <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="card user-bar" wx:if="{{isLogged}}">
-      <text class="username">{{username}}</text>
-      <text class="tenant">{{tenantName}}</text>
+    <!-- 顶部品牌区：让现场人员确认「我在哪个单位的系统里干活」 -->
+    <!-- 全屏沉浸式头图：navigationStyle=custom 去掉了系统导航栏，
+         这里用 heroTopOffset（状态栏+胶囊按钮等高区域）把内容整体下移，避免被胶囊遮住 -->
+    <view class="hero anim-item d1" style="padding-top: calc(64rpx + {{heroTopOffset}}px)">
+      <view class="hero-deco deco-1"></view>
+      <view class="hero-deco deco-2"></view>
+      <view class="hero-deco deco-3"></view>
+      <view class="brand">
+        <view class="brand-main">
+          <text class="brand-name">设备管理</text>
+          <text class="brand-sub">正丰智能 · 现场作业平台</text>
+        </view>
+        <view class="brand-side">
+          <!-- 主题开关收进头图右上角：圆形图标钮，不占单独一行 -->
+          <view class="theme-btn" bindtap="toggleTheme">
+            <text class="theme-btn-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+          </view>
+          <view class="brand-tenant-pill" wx:if="{{isLogged && tenantName}}">
+            <text class="brand-tenant">{{tenantName}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 账号卡：登录后显示身份与角色；未登录给登录入口 -->
+    <view class="card account anim-item d2" wx:if="{{isLogged}}">
+      <view class="avatar-ring">
+        <view class="avatar">{{avatarText}}</view>
+      </view>
+      <view class="account-info">
+        <text class="account-name">{{displayName}}</text>
+        <view class="role-tags" wx:if="{{roleLabels.length}}">
+          <text class="role-tag" wx:for="{{roleLabels}}" wx:key="index">{{item}}</text>
+        </view>
+        <text class="account-username" wx:else>@{{username}}</text>
+      </view>
       <text class="logout" bindtap="handleLogout">退出</text>
     </view>
-
-    <view class="card entry" bindtap="handleScan">
-      <text class="entry-title">设备信息维护</text>
-      <text class="entry-desc">扫描设备二维码，查看并补充安装信息</text>
+    <view class="card account guest anim-item d2" wx:else bindtap="goLogin">
+      <view class="avatar-ring guest-ring">
+        <view class="avatar guest-avatar">?</view>
+      </view>
+      <view class="account-info">
+        <text class="account-name">未登录</text>
+        <text class="account-username">登录后可扫码维护设备、蓝牙调试</text>
+      </view>
+      <view class="login-btn">
+        <text class="login-link">去登录</text>
+      </view>
     </view>
-    <view class="card entry" bindtap="handleDebug">
-      <text class="entry-title">设备蓝牙调试</text>
-      <text class="entry-desc">连接附近设备，读取与下发参数</text>
+
+    <!-- 主操作：圆形扫码按钮，任何人登录后都可扫码查看设备详情 -->
+    <view class="scan-wrap anim-item d3" bindtap="handleScan">
+      <view class="scan-circle">
+        <view class="scan-ring r1"></view>
+        <view class="scan-ring r2"></view>
+        <view class="scan-disc">
+          <view class="scan-icon">
+            <view class="scan-corner tl"></view>
+            <view class="scan-corner tr"></view>
+            <view class="scan-corner bl"></view>
+            <view class="scan-corner br"></view>
+            <view class="scan-line moving"></view>
+          </view>
+        </view>
+      </view>
     </view>
 
-    <!--
-      主题开关放在流式布局的末尾而不是像蓝牙页那样绝对定位到右上角：
-      首页右上角已经被「退出」占了，绝对定位会压在它上面点不中。
-    -->
-    <view class="theme-row" bindtap="toggleTheme">
-      <text class="theme-icon">{{darkMode ? '🌙' : '☀️'}}</text>
-      <text class="theme-text">{{darkMode ? '深色模式' : '浅色模式'}}</text>
+    <!-- 手动搜索：扫码失败时的降级方案，输入设备尾号匹配 -->
+    <view class="search-section anim-item d4" wx:if="{{isLogged}}">
+      <view class="search-divider">
+        <text class="divider-line"></text>
+        <text class="divider-text">或手动查找</text>
+        <text class="divider-line"></text>
+      </view>
+      <view class="search-box {{searchFocused ? 'focused' : ''}}">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          value="{{searchValue}}"
+          placeholder="输入设备编号尾号搜索"
+          placeholder-class="search-placeholder"
+          bindinput="onSearchInput"
+          bindfocus="onSearchFocus"
+          bindblur="onSearchBlur"
+        />
+        <text class="search-clear" wx:if="{{searchValue}}" bindtap="clearSearch">×</text>
+      </view>
+      <!-- 搜索结果 -->
+      <view class="search-results" wx:if="{{searchResults.length > 0}}">
+        <view
+          class="search-item"
+          wx:for="{{searchResults}}"
+          wx:key="id"
+          style="animation-delay: {{index * 50}}ms"
+          data-sn="{{item.sn}}"
+          bindtap="selectDevice"
+        >
+          <view class="search-item-info">
+            <text class="search-item-sn">{{item.sn}}</text>
+            <text class="search-item-name" wx:if="{{item.name}}">{{item.name}}</text>
+          </view>
+          <text class="search-item-community" wx:if="{{item.community}}">{{item.community}}</text>
+          <text class="search-item-arrow">›</text>
+        </view>
+      </view>
+      <view class="search-empty" wx:elif="{{searchValue && !searching && searchResults.length === 0}}">
+        <text class="search-empty-text">未找到匹配设备</text>
+      </view>
+    </view>
+
+    <!-- 功能网格：后续新功能往这里加卡片 -->
+    <view class="grid">
     </view>
   </view>
 </template>
@@ -30,7 +121,7 @@
 import { createPage } from '@mpxjs/core'
 import { useAuthStore } from '../../stores/auth'
 import { useDeviceStore } from '../../stores/device'
-import { getDeviceBySn } from '../../services/api/tenant'
+import { getDeviceBySn, searchDevices } from '../../services/api/tenant'
 
 /**
  * 扫码失败时的场景化文案表，逐条对应规格 §3.9.2。
@@ -79,21 +170,59 @@ function classifyError(err) {
   return 'network'
 }
 
+/** 角色码 → 展示名。只是显示映射，后端 role_names 那套在管理端，这里只可能有登录快照里的 code */
+const ROLE_LABELS = { installer: '设备安装', debugger: '蓝牙调试' }
+
 createPage({
   data: {
     isLogged: false,
     username: '',
+    displayName: '',
+    avatarText: '',
     tenantName: '',
+    roleLabels: [],
+    canInstall: false,
+    canDebug: false,
     darkMode: false,
+    searchValue: '',
+    searchResults: [],
+    searching: false,
+    searchFocused: false,
+    heroTopOffset: 0,
+  },
+
+  onLoad() {
+    // 首页做沉浸式头图（见底部 json 配置 navigationStyle: custom），系统导航栏没了，
+    // 胶囊按钮（右上角 ⋯/返回）却还在固定位置浮着，得自己算出等效的「导航栏高度」
+    // 把头图内容顶下去，不然主题按钮、租户角标会被胶囊压住。
+    //
+    // 公式依据：胶囊按钮上下与状态栏/导航栏底边的间距是对称的，所以
+    // (胶囊.top − 状态栏高度) 就是那段留白，×2 再加胶囊自身高度，
+    // 正好等于系统导航栏的内容区高度——不用为刘海屏/灵动岛机型特判。
+    const { statusBarHeight } = wx.getWindowInfo()
+    const menuButton = wx.getMenuButtonBoundingClientRect()
+    const navBarHeight = (menuButton.top - statusBarHeight) * 2 + menuButton.height
+    this.setData({ heroTopOffset: statusBarHeight + navBarHeight })
   },
 
   onShow() {
+    // 头图背景是蓝色，状态栏图标要用白色才看得清。从别的页面（用系统导航栏，
+    // 图标默认黑色）返回时状态栏颜色会被带黑，所以每次 onShow 都要重新设一遍。
+    wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#007AFF' })
+
     const auth = useAuthStore()
+    const displayName = auth.user.realname || auth.user.username
     this.setData({
       darkMode: useDeviceStore().darkMode,
       isLogged: auth.isLogged,
       username: auth.user.username,
+      displayName,
+      // 头像取姓名首字符。没有姓名的账号退回用户名首字符，都还没有才给「?」
+      avatarText: (displayName || '?').slice(0, 1),
       tenantName: auth.tenant.name,
+      roleLabels: (auth.user.roles || []).map(code => ROLE_LABELS[code] || code),
+      canInstall: auth.canInstall,
+      canDebug: auth.canDebug,
     })
 
     // 登录了却一个角色都没有：两个入口都点不动，与其让他挨个点出两次拒绝，
@@ -112,6 +241,10 @@ createPage({
     const store = useDeviceStore()
     store.toggleDarkMode()
     this.setData({ darkMode: store.darkMode })
+  },
+
+  goLogin() {
+    wx.navigateTo({ url: '/pages/login/index' })
   },
 
   /** 未登录时统一在这里拦并跳登录，两个入口共用 */
@@ -169,15 +302,6 @@ createPage({
 
   async handleScan() {
     if (!this.requireLogin()) return
-    if (!useAuthStore().canInstall) {
-      wx.showModal({
-        title: '账户暂无操作权限',
-        content: '你的账户还没有分配设备安装权限，请联系管理员开通。',
-        showCancel: false,
-        confirmText: '知道了',
-      })
-      return
-    }
 
     let sn = ''
     try {
@@ -244,30 +368,268 @@ createPage({
       },
     })
   },
+
+  /** 搜索输入：防抖 300ms 后查询 */
+  onSearchInput(e) {
+    const value = (e.detail.value || '').trim()
+    this.setData({ searchValue: value })
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    if (!value) {
+      this.setData({ searchResults: [], searching: false })
+      return
+    }
+    this.setData({ searching: true })
+    this._searchTimer = setTimeout(() => this.doSearch(value), 300)
+  },
+
+  onSearchFocus() {
+    this.setData({ searchFocused: true })
+  },
+
+  onSearchBlur() {
+    // 延迟隐藏，让点击搜索结果项的事件先触发
+    setTimeout(() => this.setData({ searchFocused: false }), 200)
+  },
+
+  clearSearch() {
+    this.setData({ searchValue: '', searchResults: [], searching: false })
+  },
+
+  async doSearch(keyword) {
+    try {
+      const data = await searchDevices(keyword)
+      this.setData({ searchResults: (data && data.list) || [], searching: false })
+    } catch (e) {
+      this.setData({ searchResults: [], searching: false })
+    }
+  },
+
+  /** 选中搜索结果项，跳转到设备详情 */
+  selectDevice(e) {
+    const sn = e.currentTarget.dataset.sn
+    if (!sn) return
+    this.setData({ searchValue: '', searchResults: [], searching: false })
+    wx.navigateTo({ url: `/pages/device/detail?sn=${encodeURIComponent(sn)}` })
+  },
 })
 </script>
 
 <style scoped>
-.page { padding: 16rpx; min-height: 100vh; position: relative; }
+.page { min-height: 100vh; position: relative; box-sizing: border-box; padding: 0 24rpx 56rpx; }
 
-.user-bar { display: flex; align-items: center; }
-.username { font-size: 30rpx; font-weight: 600; color: var(--color-text); }
-.tenant { flex: 1; margin-left: 16rpx; font-size: 26rpx; color: var(--color-text-secondary); }
-.logout { font-size: 26rpx; color: var(--color-danger); padding: 8rpx 16rpx; }
-
-.entry { padding: 40rpx 32rpx; }
-.entry:active { background: var(--color-bg); }
-.entry-title { display: block; font-size: 34rpx; font-weight: 600; color: var(--color-text); }
-.entry-desc { display: block; margin-top: 12rpx; font-size: 26rpx; color: var(--color-text-secondary); }
-
-.theme-row {
-  display: flex; align-items: center; justify-content: center; gap: 12rpx;
-  margin-top: 32rpx; padding: 20rpx;
+/* ========== 入场动画：分片上浮 ========== */
+.anim-item { opacity: 0; animation: fadeUp .55s cubic-bezier(.22, .9, .32, 1) forwards; }
+.d1 { animation-delay: .02s; }
+.d2 { animation-delay: .10s; }
+.d3 { animation-delay: .18s; }
+.d4 { animation-delay: .26s; }
+.d5 { animation-delay: .34s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(32rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.theme-icon { font-size: 32rpx; }
-.theme-text { font-size: 24rpx; color: var(--color-text-secondary); }
+
+/* ========== 品牌头图：iOS 蓝渐变 ========== */
+.hero {
+  position: relative; overflow: hidden;
+  margin: 0 -24rpx; padding: 64rpx 40rpx 112rpx;
+  background: linear-gradient(160deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
+  border-radius: 0 0 48rpx 48rpx;
+}
+.hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
+.deco-1 { width: 360rpx; height: 360rpx; top: -150rpx; right: -100rpx; background: rgba(255, 255, 255, 0.10); }
+.deco-2 { width: 200rpx; height: 200rpx; bottom: -70rpx; left: -50rpx; background: rgba(255, 255, 255, 0.07); }
+.deco-3 { width: 80rpx; height: 80rpx; top: 48rpx; left: 58%; background: rgba(255, 255, 255, 0.14); }
+.brand { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+.brand-main { display: flex; flex-direction: column; }
+.brand-side { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+.theme-btn {
+  width: 64rpx; height: 64rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.22); border: 1rpx solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(20rpx);
+  transition: transform .2s ease;
+}
+.theme-btn:active { transform: scale(0.88) rotate(-15deg); }
+.theme-btn-icon { font-size: 30rpx; line-height: 1; }
+.brand-name { font-size: 48rpx; font-weight: 700; color: #fff; letter-spacing: 2rpx; }
+.brand-sub { margin-top: 12rpx; font-size: 24rpx; color: rgba(255, 255, 255, 0.75); letter-spacing: 1rpx; }
+.brand-tenant-pill {
+  max-width: 300rpx; margin-top: 16rpx; padding: 8rpx 24rpx; border-radius: 999rpx; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.2); border: 1rpx solid rgba(255, 255, 255, 0.3);
+}
+.brand-tenant {
+  display: block; font-size: 22rpx; color: #fff; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ========== 账号卡：悬浮叠层 ========== */
+.account {
+  position: relative; z-index: 2;
+  display: flex; align-items: center;
+  margin: -72rpx 8rpx 0; padding: 32rpx 28rpx;
+  border-radius: 28rpx;
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.10);
+}
+.avatar-ring {
+  width: 104rpx; height: 104rpx; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 122, 255, 0.08);
+}
+.avatar {
+  width: 88rpx; height: 88rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 38rpx; font-weight: 600; color: #fff;
+  background: linear-gradient(135deg, #4C9AFF, #007AFF);
+  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.35);
+}
+.guest-ring { background: var(--color-fill); }
+.guest-avatar { background: var(--color-text-tertiary); box-shadow: none; }
+.account-info { flex: 1; margin-left: 24rpx; overflow: hidden; }
+.account-name { display: block; font-size: 34rpx; font-weight: 600; color: var(--color-text); letter-spacing: 0.5rpx; }
+.account-username {
+  display: block; margin-top: 8rpx; font-size: 24rpx; color: var(--color-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.role-tags { display: flex; flex-wrap: wrap; margin-top: 12rpx; }
+.role-tag {
+  margin-right: 12rpx; padding: 6rpx 20rpx; border-radius: 999rpx;
+  font-size: 20rpx; font-weight: 500; color: var(--color-primary);
+  background: rgba(0, 122, 255, 0.10);
+}
+.logout { font-size: 26rpx; color: var(--color-danger); padding: 12rpx 8rpx 12rpx 24rpx; flex-shrink: 0; }
+.login-btn {
+  flex-shrink: 0; padding: 14rpx 32rpx; border-radius: 999rpx;
+  background: var(--color-primary);
+  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.3);
+}
+.login-btn:active { opacity: 0.8; }
+.login-link { font-size: 26rpx; color: #fff; font-weight: 600; }
+
+/* ========== 扫码主操作：圆形缓动按钮 ========== */
+.scan-wrap {
+  display: flex; align-items: center; justify-content: center;
+  padding: 64rpx 0 40rpx;
+}
+.scan-circle {
+  position: relative; width: 300rpx; height: 300rpx;
+  display: flex; align-items: center; justify-content: center;
+}
+/* 两层向外扩散的光环，营造呼吸缓动 */
+.scan-ring {
+  position: absolute; top: 50%; left: 50%;
+  border-radius: 50%;
+  border: 3rpx solid rgba(0, 122, 255, 0.45);
+  animation: ringPulse 2.6s cubic-bezier(.25, .46, .45, .94) infinite;
+}
+.scan-ring.r1 { width: 280rpx; height: 280rpx; margin: -140rpx 0 0 -140rpx; }
+.scan-ring.r2 { width: 300rpx; height: 300rpx; margin: -150rpx 0 0 -150rpx; animation-delay: .6s; }
+@keyframes ringPulse {
+  0% { opacity: 0.8; transform: scale(0.82); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+.scan-disc {
+  position: relative; width: 228rpx; height: 228rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  box-shadow: 0 20rpx 48rpx rgba(0, 122, 255, 0.4), inset 0 2rpx 0 rgba(255, 255, 255, 0.35);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.scan-wrap:active .scan-disc { transform: scale(0.94); box-shadow: 0 12rpx 30rpx rgba(0, 122, 255, 0.3); }
+.scan-icon { position: relative; width: 96rpx; height: 96rpx; }
+.scan-corner { position: absolute; width: 28rpx; height: 28rpx; border-color: #fff; border-style: solid; }
+.scan-corner.tl { top: 0; left: 0; border-width: 6rpx 0 0 6rpx; border-radius: 6rpx 0 0 0; }
+.scan-corner.tr { top: 0; right: 0; border-width: 6rpx 6rpx 0 0; border-radius: 0 6rpx 0 0; }
+.scan-corner.bl { bottom: 0; left: 0; border-width: 0 0 6rpx 6rpx; border-radius: 0 0 0 6rpx; }
+.scan-corner.br { bottom: 0; right: 0; border-width: 0 6rpx 6rpx 0; border-radius: 0 0 6rpx 0; }
+.scan-line {
+  position: absolute; left: 12rpx; right: 12rpx; top: 50%; height: 4rpx; margin-top: -2rpx;
+  background: rgba(255, 255, 255, 0.95); border-radius: 2rpx;
+  box-shadow: 0 0 14rpx rgba(255, 255, 255, 0.9);
+}
+.scan-line.moving { animation: scanMove 2.2s ease-in-out infinite; }
+@keyframes scanMove {
+  0%, 100% { top: 16%; }
+  50% { top: 82%; }
+}
+
+/* ========== 功能网格 ========== */
+.grid { margin-top: 24rpx; }
+.func { display: flex; align-items: center; padding: 32rpx 28rpx; position: relative; }
+.func:active { background: var(--color-fill); }
+.func.disabled .func-title, .func.disabled .func-desc { opacity: 0.45; }
+.func-icon {
+  position: relative; width: 80rpx; height: 80rpx; border-radius: 22rpx; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 122, 255, 0.10);
+}
+.ble-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: var(--color-primary); }
+.ble-wave { position: absolute; border: 3rpx solid var(--color-primary); border-radius: 50%; opacity: 0.5; }
+.ble-wave.w1 { width: 36rpx; height: 36rpx; }
+.ble-wave.w2 { width: 56rpx; height: 56rpx; opacity: 0.25; }
+.func-text { flex: 1; margin-left: 24rpx; }
+.func-title { display: block; font-size: 30rpx; font-weight: 600; color: var(--color-text); }
+.func-desc { display: block; margin-top: 8rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+.func-arrow { font-size: 40rpx; color: var(--color-text-tertiary); padding-left: 16rpx; }
+.dark-badge { position: static; flex-shrink: 0; margin-left: 16rpx; }
+
+/* ========== 深色模式补丁 ========== */
+.page.dark .hero { background: linear-gradient(160deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%); }
+.page.dark .account { box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.5); }
+.page.dark .role-tag { background: rgba(10, 132, 255, 0.16); }
+.page.dark .func-icon { background: rgba(10, 132, 255, 0.16); }
+.page.dark .scan-disc { box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.55), inset 0 2rpx 0 rgba(255, 255, 255, 0.25); }
+.page.dark .scan-ring { border-color: rgba(10, 132, 255, 0.5); }
+.page.dark .theme-btn { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.24); }
+.page.dark .search-box { background: var(--color-card); }
+.page.dark .search-results { background: var(--color-card); }
+
+/* ========== 搜索区域：iOS 圆角搜索栏 ========== */
+.search-section { margin-top: 4rpx; }
+.search-divider { display: flex; align-items: center; padding: 32rpx 0 24rpx; }
+.divider-line { flex: 1; height: 1rpx; background: var(--color-border); }
+.divider-text { margin: 0 24rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
+.search-box {
+  display: flex; align-items: center;
+  padding: 0 28rpx; border-radius: 999rpx;
+  background: var(--color-card); border: 2rpx solid transparent;
+  box-shadow: var(--shadow-card);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.search-box.focused {
+  border-color: var(--color-primary);
+  box-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.15);
+}
+.search-icon { font-size: 36rpx; color: var(--color-text-tertiary); margin-right: 14rpx; }
+.search-box.focused .search-icon { color: var(--color-primary); }
+.search-input { flex: 1; height: 88rpx; font-size: 28rpx; color: var(--color-text); }
+.search-placeholder { color: var(--color-text-tertiary); font-size: 26rpx; }
+.search-clear { padding: 12rpx; font-size: 36rpx; color: var(--color-text-tertiary); flex-shrink: 0; }
+.search-results {
+  margin-top: 16rpx; border-radius: 24rpx; overflow: hidden;
+  background: var(--color-card);
+  box-shadow: var(--shadow-float);
+  max-height: 600rpx; overflow-y: auto;
+}
+.search-item {
+  display: flex; align-items: center; padding: 26rpx 28rpx;
+  border-bottom: 1rpx solid var(--color-border);
+  opacity: 0; animation: fadeUp .3s ease forwards;
+}
+.search-item:last-child { border-bottom: none; }
+.search-item:active { background: var(--color-fill); }
+.search-item-info { flex: 1; overflow: hidden; }
+.search-item-sn { display: block; font-size: 28rpx; font-weight: 600; color: var(--color-text); font-family: 'SF Mono', Menlo, monospace; }
+.search-item-name { display: block; margin-top: 4rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+.search-item-community { font-size: 24rpx; color: var(--color-text-secondary); margin-right: 12rpx; }
+.search-item-arrow { font-size: 32rpx; color: var(--color-text-tertiary); }
+.search-empty { padding: 32rpx 24rpx; text-align: center; }
+.search-empty-text { font-size: 24rpx; color: var(--color-text-secondary); }
 </style>
 
 <script type="application/json">
-{ "navigationBarTitleText": "设备管理" }
+{
+  "navigationBarTitleText": "设备管理",
+  "navigationStyle": "custom"
+}
 </script>

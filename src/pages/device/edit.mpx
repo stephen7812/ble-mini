@@ -43,11 +43,11 @@
         <input class="input" value="{{form.remark}}" placeholder="选填" placeholder-class="input-placeholder" bindinput="onRemarkInput" />
       </view>
       <view class="photos">
-        <view class="photo-wrap" wx:for="{{form.install_photos}}" wx:key="*this">
-          <image class="photo" src="{{item}}" mode="aspectFill" data-url="{{item}}" bindtap="previewPhoto" />
+        <view class="photo-wrap" wx:for="{{form.install_photos}}" wx:for-index="photoIdx" wx:key="*this">
+          <image class="photo" src="{{form.local_photos[photoIdx] || item}}" mode="aspectFill" data-url="{{item}}" bindtap="previewPhoto" />
           <text class="photo-del" data-url="{{item}}" bindtap="removePhoto">×</text>
         </view>
-        <view class="photo-add" wx:if="{{form.install_photos.length < 6}}" bindtap="choosePhoto">+</view>
+        <view class="photo-add" wx:if="{{form.install_photos.length < 3}}" bindtap="choosePhoto">+</view>
       </view>
     </view>
 
@@ -59,11 +59,11 @@
 
 <script>
 import { createPage } from '@mpxjs/core'
-import { getCommunityOptions, getDeviceBySn, updateDevice, uploadImage } from '../../services/api/tenant'
+import { getCommunityOptions, getDeviceBySn, updateDevice, uploadImage, downloadFile, normalizeFileUrl } from '../../services/api/tenant'
 import { useAuthStore } from '../../stores/auth'
 import { useDeviceStore } from '../../stores/device'
 
-const MAX_PHOTOS = 6
+const MAX_PHOTOS = 3
 
 createPage({
   data: {
@@ -91,6 +91,7 @@ createPage({
       installer_name: '',
       install_time: null,
       install_photos: [],
+      local_photos: [],
     },
   },
 
@@ -130,7 +131,8 @@ createPage({
         // realname 在 auth store 里已经兜底成用户名，这里不用再判一次空
         installer_name: device.installer_name || useAuthStore().user.realname,
         install_time: device.install_time || null,
-        install_photos: device.install_photos || [],
+        install_photos: (device.install_photos || []).map(normalizeFileUrl),
+        local_photos: [],
       }
 
       this.setData({
@@ -141,6 +143,10 @@ createPage({
         installDate: form.install_time ? this.toDateStr(form.install_time) : '',
       })
       this.refreshDerived()
+      // 下载已有图片到本地临时文件，解决编辑页加载时已保存图片显示空白的问题
+      if (form.install_photos.length > 0) {
+        this.downloadExistingPhotos(form.install_photos)
+      }
     } catch (err) {
       wx.showModal({
         title: '加载失败',
@@ -171,6 +177,20 @@ createPage({
           ? '未填写'
           : `${form.longitude}, ${form.latitude}`,
     })
+  },
+
+  /** 串行下载已有图片到本地临时文件，解决编辑页加载时已保存图片显示空白的问题 */
+  async downloadExistingPhotos(urls) {
+    const localPhotos = []
+    for (const url of urls) {
+      try {
+        const localPath = await downloadFile(url)
+        localPhotos.push(localPath)
+      } catch (e) {
+        localPhotos.push('')
+      }
+    }
+    this.patchForm({ local_photos: localPhotos })
   },
 
   toDateStr(seconds) {
@@ -229,13 +249,20 @@ createPage({
   },
 
   previewPhoto(e) {
-    wx.previewImage({ current: e.currentTarget.dataset.url, urls: this.data.form.install_photos })
+    // install_photos 存的是相对路径，previewImage 要绝对地址，过一道归一
+    wx.previewImage({
+      current: normalizeFileUrl(e.currentTarget.dataset.url),
+      urls: this.data.form.install_photos.map(normalizeFileUrl),
+    })
   },
 
   removePhoto(e) {
     const url = e.currentTarget.dataset.url
-    // 只从表单摘掉，不删服务器文件：用户可能还会取消保存
-    this.patchForm({ install_photos: this.data.form.install_photos.filter(u => u !== url) })
+    // 从两个数组同时摘掉
+    this.patchForm({
+      install_photos: this.data.form.install_photos.filter(u => u !== url),
+      local_photos: this.data.form.local_photos.filter((_, i) => this.data.form.install_photos[i] !== url),
+    })
   },
 
   async choosePhoto() {
@@ -255,8 +282,16 @@ createPage({
       // 串行上传：安装现场网络普遍不好，并发几张更容易整批超时，
       // 而且串行能在中途失败时保住已经传上去的那几张。
       for (const f of files) {
-        const url = await uploadImage(f.tempFilePath)
-        this.patchForm({ install_photos: [...this.data.form.install_photos, url] })
+        // 后端现在返回站点相对路径（/upload/...），原样入库——
+        // 域名拼接交给展示侧（normalizeFileUrl），数据库不耦合域名。
+        const url = await uploadImage(f.tempFilePath, this.data.form.sn)
+        // 上传成功后用 wx.downloadFile 下载到本地临时文件，
+        // 解决真机预览时 <image> 组件无法加载 HTTP 图片的问题（iOS ATS 限制）。
+        const localPath = await downloadFile(url)
+        this.patchForm({
+          install_photos: [...this.data.form.install_photos, url],
+          local_photos: [...this.data.form.local_photos, localPath],
+        })
       }
       wx.hideLoading()
     } catch (err) {
@@ -300,40 +335,54 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 16rpx; min-height: 100vh; }
+.page { padding: 24rpx 24rpx 48rpx; min-height: 100vh; box-sizing: border-box; }
+
+.card {
+  padding: 32rpx 28rpx;
+  border-radius: 28rpx;
+  box-shadow: var(--shadow-card);
+}
 
 .card-title {
-  padding: 4rpx 0 12rpx;
-  font-size: 30rpx; font-weight: 600; color: var(--color-text);
+  padding: 4rpx 0 16rpx;
+  font-size: 30rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx;
 }
 
-.row { display: flex; align-items: center; padding: 16rpx 0; }
+.row {
+  display: flex; align-items: center;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--color-border);
+}
+.row:last-child { border-bottom: none; }
 .label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); }
 .value { flex: 1; font-size: 28rpx; color: var(--color-text); word-break: break-all; }
-.value.muted { color: var(--color-text-secondary); }
+.value.muted { color: var(--color-text-tertiary); }
 
 .input { flex: 1; font-size: 28rpx; color: var(--color-text); }
-.input-placeholder { color: var(--color-text-secondary); font-size: 26rpx; }
+.input-placeholder { color: var(--color-text-tertiary); font-size: 26rpx; }
 .picker { flex: 1; }
 
-.hint { padding: 8rpx 0 4rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+.hint { padding: 16rpx 0 4rpx; font-size: 24rpx; color: var(--color-text-secondary); line-height: 1.5; }
 
-.photos { display: flex; flex-wrap: wrap; padding: 8rpx 0 4rpx; }
+.photos { display: flex; flex-wrap: wrap; padding: 16rpx 0 4rpx; }
 .photo-wrap { position: relative; margin: 0 16rpx 16rpx 0; }
-.photo { width: 180rpx; height: 180rpx; border-radius: var(--radius); }
+.photo { width: 180rpx; height: 180rpx; border-radius: 20rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08); }
 .photo-del {
-  position: absolute; top: -10rpx; right: -10rpx;
-  width: 40rpx; height: 40rpx; line-height: 36rpx; text-align: center;
-  border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; font-size: 30rpx;
+  position: absolute; top: -12rpx; right: -12rpx;
+  width: 44rpx; height: 44rpx; line-height: 40rpx; text-align: center;
+  border-radius: 50%; background: rgba(0,0,0,0.65); color: #fff; font-size: 32rpx;
+  box-shadow: 0 4rpx 10rpx rgba(0,0,0,0.2);
 }
 .photo-add {
-  width: 180rpx; height: 180rpx; line-height: 180rpx; text-align: center;
-  border: 2rpx dashed var(--color-border); border-radius: var(--radius);
-  color: var(--color-text-secondary); font-size: 60rpx;
+  width: 180rpx; height: 180rpx; line-height: 176rpx; text-align: center;
+  border: 2rpx dashed var(--color-border); border-radius: 20rpx;
+  color: var(--color-text-tertiary); font-size: 60rpx;
+  background: var(--color-fill);
 }
+.photo-add:active { background: var(--color-fill-strong); }
 
-.actions { padding: 16rpx; }
-.btn-block { width: 100%; box-sizing: border-box; }
+.actions { padding: 32rpx 16rpx 16rpx; }
+.btn-block { width: 100%; box-sizing: border-box; height: 96rpx; line-height: 96rpx; }
 </style>
 
 <script type="application/json">

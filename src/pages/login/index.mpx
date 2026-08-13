@@ -1,25 +1,69 @@
 <template>
   <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="header">
+    <!-- 品牌头图：与首页同一套渐变语言 -->
+    <view class="hero anim-item d1">
+      <view class="hero-deco deco-1"></view>
+      <view class="hero-deco deco-2"></view>
+      <view class="hero-deco deco-3"></view>
+      <!-- 纯 CSS 阀门手轮 Logo：外环 + 十字辐条，呼应智能阀门业务 -->
+      <view class="logo-ring">
+        <view class="logo-mark">
+          <view class="logo-spoke v"></view>
+          <view class="logo-spoke h"></view>
+          <view class="logo-hub"></view>
+        </view>
+      </view>
       <text class="title">设备管理</text>
-      <text class="subtitle">请使用租户端账号登录</text>
+      <text class="subtitle">正丰智能 · 现场作业平台</text>
     </view>
 
-    <view class="card">
+    <!-- 登录卡：上浮叠压头图 -->
+    <view class="card login-card anim-item d2">
+      <text class="login-title">账号登录</text>
+      <text class="login-sub">请使用租户端账号登录</text>
+
       <view class="field-group">
         <view class="field-label">用户名</view>
-        <input class="field-input" model:value="{{username}}" placeholder="请输入用户名" placeholder-class="field-placeholder" />
+        <view class="field-wrap {{focusField === 'username' ? 'focused' : ''}}">
+          <input
+            class="field-input"
+            model:value="{{username}}"
+            placeholder="请输入用户名"
+            placeholder-class="field-placeholder"
+            data-field="username"
+            bindfocus="onFieldFocus"
+            bindblur="onFieldBlur"
+          />
+        </view>
       </view>
 
       <view class="field-group">
         <view class="field-label">密码</view>
-        <input class="field-input" model:value="{{password}}" password placeholder="请输入密码" placeholder-class="field-placeholder" />
+        <view class="field-wrap {{focusField === 'password' ? 'focused' : ''}}">
+          <input
+            class="field-input"
+            model:value="{{password}}"
+            password
+            placeholder="请输入密码"
+            placeholder-class="field-placeholder"
+            data-field="password"
+            bindfocus="onFieldFocus"
+            bindblur="onFieldBlur"
+            bindconfirm="handleLogin"
+          />
+        </view>
       </view>
 
-      <button class="btn-primary btn-block" style="margin-top:32rpx" loading="{{loading}}" disabled="{{loading}}" bindtap="handleLogin">登录</button>
+      <view class="error-pill" wx:if="{{errorMsg}}">
+        <text class="error">{{errorMsg}}</text>
+      </view>
 
-      <text class="error" wx:if="{{errorMsg}}">{{errorMsg}}</text>
+      <button class="login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="handleLogin">
+        {{loading ? '登录中' : '登 录'}}
+      </button>
     </view>
+
+    <text class="footer anim-item d3">登录即代表同意现场作业管理规范</text>
   </view>
 </template>
 
@@ -29,10 +73,18 @@ import { useAuthStore } from '../../stores/auth'
 import { useDeviceStore } from '../../stores/device'
 
 createPage({
-  data: { username: '', password: '', loading: false, errorMsg: '', darkMode: false },
+  data: { username: '', password: '', loading: false, errorMsg: '', darkMode: false, focusField: '' },
 
   onShow() {
     this.setData({ darkMode: useDeviceStore().darkMode })
+  },
+
+  onFieldFocus(e) {
+    this.setData({ focusField: e.currentTarget.dataset.field || '' })
+  },
+
+  onFieldBlur() {
+    this.setData({ focusField: '' })
   },
 
   async handleLogin() {
@@ -63,37 +115,119 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 120rpx 32rpx 16rpx; min-height: 100vh; }
+.page { min-height: 100vh; box-sizing: border-box; padding: 0 32rpx 48rpx; }
 
-.header { text-align: center; margin-bottom: 60rpx; }
-.title {
-  display: block; font-size: 48rpx; font-weight: 600;
-  color: var(--color-text);
-}
-.subtitle {
-  display: block; margin-top: 16rpx;
-  font-size: 26rpx; color: var(--color-text-secondary);
+/* ========== 入场动画 ========== */
+.anim-item { opacity: 0; animation: fadeUp .55s cubic-bezier(.22, .9, .32, 1) forwards; }
+.d1 { animation-delay: .02s; }
+.d2 { animation-delay: .12s; }
+.d3 { animation-delay: .24s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(32rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.field-group { margin-bottom: 24rpx; }
-.field-group:last-of-type { margin-bottom: 0; }
+/* ========== 品牌头图 ========== */
+.hero {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+  margin: 0 -32rpx; padding: 100rpx 40rpx 128rpx;
+  background: linear-gradient(160deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
+  border-radius: 0 0 56rpx 56rpx;
+}
+.hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
+.deco-1 { width: 380rpx; height: 380rpx; top: -160rpx; right: -110rpx; background: rgba(255, 255, 255, 0.10); }
+.deco-2 { width: 200rpx; height: 200rpx; bottom: -40rpx; left: -60rpx; background: rgba(255, 255, 255, 0.07); }
+.deco-3 { width: 72rpx; height: 72rpx; top: 90rpx; left: 16%; background: rgba(255, 255, 255, 0.14); }
+
+/* Logo：外圈呼吸光环 + 手轮 */
+.logo-ring {
+  width: 152rpx; height: 152rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.18); border: 1rpx solid rgba(255, 255, 255, 0.32);
+  animation: logoBreath 3.2s ease-in-out infinite;
+}
+@keyframes logoBreath {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); }
+  50% { box-shadow: 0 0 0 18rpx rgba(255, 255, 255, 0); }
+}
+.logo-mark {
+  position: relative; width: 84rpx; height: 84rpx;
+  border: 7rpx solid #fff; border-radius: 50%;
+}
+.logo-spoke { position: absolute; background: #fff; border-radius: 4rpx; }
+.logo-spoke.v { left: 50%; top: -7rpx; bottom: -7rpx; width: 7rpx; margin-left: -3.5rpx; }
+.logo-spoke.h { top: 50%; left: -7rpx; right: -7rpx; height: 7rpx; margin-top: -3.5rpx; }
+.logo-hub {
+  position: absolute; left: 50%; top: 50%;
+  width: 20rpx; height: 20rpx; margin: -10rpx 0 0 -10rpx;
+  border-radius: 50%; background: #fff;
+}
+
+.title { margin-top: 36rpx; font-size: 52rpx; font-weight: 700; color: #fff; letter-spacing: 3rpx; }
+.subtitle { margin-top: 14rpx; font-size: 24rpx; color: rgba(255, 255, 255, 0.78); letter-spacing: 2rpx; }
+
+/* ========== 登录卡 ========== */
+.login-card {
+  position: relative; z-index: 2;
+  margin: -76rpx 8rpx 0; padding: 48rpx 36rpx 44rpx;
+  border-radius: 32rpx;
+  box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.10);
+}
+.login-title { display: block; font-size: 38rpx; font-weight: 700; color: var(--color-text); letter-spacing: 1rpx; }
+.login-sub { display: block; margin-top: 10rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+
+.field-group { margin-top: 32rpx; }
 .field-label {
   font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
-  margin-bottom: 8rpx;
+  margin-bottom: 12rpx;
+}
+.field-wrap {
+  border: 2rpx solid transparent; border-radius: 20rpx;
+  background: var(--color-bg);
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.field-wrap.focused {
+  border-color: var(--color-primary); background: var(--color-card);
+  box-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.14);
 }
 .field-input {
-  height: 80rpx; padding: 0 20rpx; box-sizing: border-box;
-  border: 2rpx solid var(--color-border); border-radius: var(--radius);
-  background: var(--color-card); font-size: 28rpx; color: var(--color-text);
+  height: 96rpx; padding: 0 28rpx; box-sizing: border-box;
+  font-size: 30rpx; color: var(--color-text);
 }
-.field-placeholder { color: var(--color-text-secondary); }
+.field-placeholder { color: var(--color-text-tertiary); font-size: 28rpx; }
 
-.btn-block { width: 100%; }
-
-.error {
-  display: block; margin-top: 24rpx; text-align: center;
-  font-size: 26rpx; color: var(--color-danger);
+.error-pill {
+  margin-top: 28rpx; padding: 18rpx 26rpx; border-radius: 999rpx;
+  background: rgba(255, 59, 48, 0.10);
+  animation: fadeUp .25s ease;
 }
+.error { font-size: 24rpx; font-weight: 500; color: var(--color-danger); }
+
+.login-btn {
+  width: 100%; height: 100rpx; line-height: 100rpx; padding: 0;
+  margin-top: 44rpx; border: none; border-radius: 999rpx;
+  font-size: 32rpx; font-weight: 600; color: #fff; letter-spacing: 4rpx;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  box-shadow: 0 14rpx 32rpx rgba(0, 122, 255, 0.35);
+  transition: transform .15s ease, opacity .15s ease;
+}
+.login-btn::after { border: none; }
+.login-btn:active { transform: scale(0.97); opacity: 0.92; }
+.login-btn[disabled] { opacity: 0.75; color: #fff; }
+
+.footer {
+  display: block; margin-top: 48rpx; text-align: center;
+  font-size: 22rpx; color: var(--color-text-secondary); letter-spacing: 1rpx;
+}
+
+/* ========== 深色模式补丁 ========== */
+.page.dark .hero { background: linear-gradient(160deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%); }
+.page.dark .login-card { box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.5); }
+.page.dark .field-wrap { background: #2C2C2E; }
+.page.dark .field-wrap.focused { background: #2C2C2E; box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4); }
+.page.dark .error-pill { background: rgba(255, 69, 58, 0.12); }
+.page.dark .login-btn { background: linear-gradient(135deg, #1A7AFF, #0A84FF); box-shadow: 0 14rpx 32rpx rgba(0, 0, 0, 0.5); }
 </style>
 
 <script type="application/json">

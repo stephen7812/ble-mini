@@ -1,29 +1,82 @@
 <template>
   <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="loading" wx:if="{{loading}}">加载中…</view>
+    <!-- 骨架屏：加载期间给出页面轮廓，比一行「加载中」更稳 -->
+    <block wx:if="{{loading}}">
+      <view class="sk-hero-card">
+        <view class="sk sk-label"></view>
+        <view class="sk sk-sn"></view>
+        <view class="sk sk-tag"></view>
+      </view>
+      <view class="sk-card">
+        <view class="sk sk-title"></view>
+        <view class="sk sk-line" wx:for="{{[1,2,3,4]}}" wx:key="*this"></view>
+      </view>
+    </block>
 
     <block wx:else>
-      <view class="card">
-        <view class="row"><text class="label">设备编号</text><text class="value">{{device.sn}}</text></view>
-        <view class="row"><text class="label">设备名称</text><text class="value">{{device.name || '-'}}</text></view>
+      <!-- 编号头卡：SN 是现场对设备的唯一确认依据，放最大 -->
+      <view class="hero-card anim-item d1">
+        <view class="hero-deco deco-1"></view>
+        <view class="hero-deco deco-2"></view>
+        <view class="sn-label">设备编号</view>
+        <view class="sn-row">
+          <text class="sn-value">{{device.sn}}</text>
+          <view class="copy-btn" bindtap="copySn">
+            <text class="copy-text">复制</text>
+          </view>
+        </view>
+        <view class="meta-tags" wx:if="{{device.name || device.community_name}}">
+          <text class="meta-tag" wx:if="{{device.name}}">{{device.name}}</text>
+          <text class="meta-tag" wx:if="{{device.community_name}}">{{device.community_name}}</text>
+        </view>
+      </view>
+
+      <view class="card info-card anim-item d2">
+        <view class="card-title">
+          <view class="title-bar"></view>
+          <text class="title-text">基本信息</text>
+        </view>
         <view class="row"><text class="label">所属小区</text><text class="value">{{device.community_name || '-'}}</text></view>
         <view class="row"><text class="label">省市区</text><text class="value">{{regionText || '-'}}</text></view>
         <view class="row"><text class="label">详细地址</text><text class="value">{{device.address || '-'}}</text></view>
-        <view class="row"><text class="label">经纬度</text><text class="value">{{coordText}}</text></view>
+        <view class="row">
+          <text class="label">经纬度</text>
+          <view class="value coord-value">
+            <text class="mono">{{coordText}}</text>
+            <view class="locate-btn" wx:if="{{hasCoord}}" bindtap="openLocation">
+              <view class="locate-pin"></view>
+              <text class="locate-text">导航</text>
+            </view>
+          </view>
+        </view>
         <view class="row"><text class="label">备注</text><text class="value">{{device.remark || '-'}}</text></view>
       </view>
 
-      <view class="card">
-        <view class="card-title">安装信息</view>
-        <view class="row"><text class="label">安装人</text><text class="value">{{device.installer_name || '未填写'}}</text></view>
-        <view class="row"><text class="label">安装时间</text><text class="value">{{installTimeText}}</text></view>
-        <view class="row"><text class="label">现场照片</text><text class="value">{{photoCountText}}</text></view>
+      <view class="card info-card anim-item d3">
+        <view class="card-title">
+          <view class="title-bar"></view>
+          <text class="title-text">安装信息</text>
+        </view>
+        <view class="row">
+          <text class="label">安装人</text>
+          <text class="value {{device.installer_name ? '' : 'empty'}}">{{device.installer_name || '未填写'}}</text>
+        </view>
+        <view class="row">
+          <text class="label">安装时间</text>
+          <text class="value {{installTimeText === '未填写' ? 'empty' : ''}}">{{installTimeText}}</text>
+        </view>
+        <view class="row">
+          <text class="label">现场照片</text>
+          <text class="value {{device.install_photos.length ? '' : 'empty'}}">{{photoCountText}}</text>
+        </view>
         <view class="photos" wx:if="{{device.install_photos.length > 0}}">
           <image
             wx:for="{{device.install_photos}}"
+            wx:for-index="photoIdx"
             wx:key="*this"
             class="photo"
-            src="{{item}}"
+            style="animation-delay: {{photoIdx * 80}}ms"
+            src="{{localPhotos[photoIdx] || item}}"
             mode="aspectFill"
             data-url="{{item}}"
             bindtap="previewPhoto"
@@ -31,14 +84,23 @@
         </view>
       </view>
 
-      <view class="actions">
-        <button class="btn-primary btn-block" wx:if="{{canInstall}}" bindtap="goEdit">编辑安装信息</button>
-        <!--
-          有 debugger 才出现。没有这个角色的人这里不该有任何通往调试的出口 ——
-          规格 §5.3 第 4 条是专门验这一点的。
-        -->
-        <button class="btn-outline btn-block" wx:if="{{canDebug}}" bindtap="goDebug">蓝牙调试</button>
-        <text class="tip" wx:if="{{!canInstall}}">当前账号没有设备安装权限，仅可查看</text>
+      <!-- 底部固定操作栏：现场单手握机，主操作贴拇指区 -->
+      <view class="action-bar anim-item d4">
+        <text class="tip" wx:if="{{!canInstall && !canDebug}}">当前账号没有操作权限，请联系管理员开通</text>
+        <text class="tip" wx:elif="{{!canInstall}}">当前账号没有设备安装权限，仅可蓝牙调试</text>
+        <text class="tip" wx:elif="{{!canDebug}}">当前账号没有蓝牙调试权限，仅可编辑安装信息</text>
+        <view class="action-row">
+          <button
+            class="bar-btn btn-debug {{canDebug ? '' : 'off'}}"
+            disabled="{{!canDebug}}"
+            bindtap="{{canDebug ? 'goDebug' : ''}}"
+          >蓝牙调试</button>
+          <button
+            class="bar-btn btn-edit {{canInstall ? '' : 'off'}}"
+            disabled="{{!canInstall}}"
+            bindtap="{{canInstall ? 'goEdit' : ''}}"
+          >编辑安装信息</button>
+        </view>
       </view>
     </block>
   </view>
@@ -48,7 +110,7 @@
 import { createPage } from '@mpxjs/core'
 import { useAuthStore } from '../../stores/auth'
 import { useDeviceStore } from '../../stores/device'
-import { getDeviceBySn } from '../../services/api/tenant'
+import { getDeviceBySn, downloadFile, normalizeFileUrl } from '../../services/api/tenant'
 
 createPage({
   data: {
@@ -58,8 +120,10 @@ createPage({
     canDebug: false,
     darkMode: false,
     device: { install_photos: [] },
+    localPhotos: [],
     regionText: '',
     coordText: '-',
+    hasCoord: false,
     installTimeText: '未填写',
     photoCountText: '无',
   },
@@ -90,17 +154,24 @@ createPage({
     this.setData({ loading: true })
     try {
       const device = await getDeviceBySn(this.data.sn)
-      device.install_photos = device.install_photos || []
+      // 库里照片 URL 的 host 是上传时写死的，统一归一到当前 API 地址再展示/下载
+      device.install_photos = (device.install_photos || []).map(normalizeFileUrl)
+      const hasCoord =
+        device.longitude !== null && device.latitude !== null &&
+        device.longitude !== undefined && device.latitude !== undefined
       this.setData({
         device,
+        localPhotos: [],
         regionText: [device.province, device.city, device.district].filter(Boolean).join(' / '),
-        coordText:
-          device.longitude === null || device.latitude === null || device.longitude === undefined || device.latitude === undefined
-            ? '未填写'
-            : `${device.longitude}, ${device.latitude}`,
+        coordText: hasCoord ? `${device.longitude}, ${device.latitude}` : '未填写',
+        hasCoord,
         installTimeText: device.install_time ? this.formatTime(device.install_time) : '未填写',
         photoCountText: device.install_photos.length ? `${device.install_photos.length} 张` : '无',
       })
+      // 下载图片到本地临时文件，解决真机预览时 <image> 无法加载 HTTP 图片的问题
+      if (device.install_photos.length > 0) {
+        this.downloadPhotos(device.install_photos)
+      }
     } catch (err) {
       // 这里不做三态分文案：能走到详情页说明扫码时查得到，此刻查不到基本是网络或登录态问题，
       // 后端原文案已经够用，直接透传并退回上一页。
@@ -122,8 +193,46 @@ createPage({
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
   },
 
+  /** 串行下载图片到本地临时文件，真机预览时 <image> 组件用本地路径加载 */
+  async downloadPhotos(urls) {
+    const localPhotos = []
+    for (const url of urls) {
+      try {
+        const localPath = await downloadFile(url)
+        localPhotos.push(localPath)
+      } catch (e) {
+        // 下载失败就保留空位，模板会用服务端 URL 兜底
+        localPhotos.push('')
+      }
+    }
+    this.setData({ localPhotos })
+  },
+
   previewPhoto(e) {
     wx.previewImage({ current: e.currentTarget.dataset.url, urls: this.data.device.install_photos })
+  },
+
+  /** 现场抄编号是高频动作，一键复制比长按选择稳 */
+  copySn() {
+    if (!this.data.sn) return
+    wx.setClipboardData({ data: this.data.sn })
+  },
+
+  /**
+   * 调起内置地图查看设备位置，用户可从地图页一键导航。
+   * 注意：openLocation 按 gcj02 坐标渲染，若后续发现点位整体偏移，
+   * 说明后端存的是 wgs84，需要在编辑/录入侧统一坐标系，不要在这里做转换。
+   */
+  openLocation() {
+    const { longitude, latitude, name, address } = this.data.device
+    if (!this.data.hasCoord) return
+    wx.openLocation({
+      longitude: Number(longitude),
+      latitude: Number(latitude),
+      name: name || '设备位置',
+      address: address || '',
+      scale: 17,
+    })
   },
 
   goEdit() {
@@ -131,38 +240,183 @@ createPage({
   },
 
   goDebug() {
-    wx.navigateTo({ url: '/pages/ble/prepare' })
+    // 带上当前设备编号：从详情页进调试，准备页自动回填，现场不用再扫一次
+    wx.navigateTo({ url: `/pages/ble/prepare?sn=${encodeURIComponent(this.data.sn)}` })
   },
 })
 </script>
 
 <style scoped>
-.page { padding: 16rpx; min-height: 100vh; }
+.page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx 220rpx; }
 
-.loading {
-  padding: 120rpx 0; text-align: center;
-  font-size: 28rpx; color: var(--color-text-secondary);
+/* ========== 入场动画 ========== */
+.anim-item { opacity: 0; animation: fadeUp .5s cubic-bezier(.22, .9, .32, 1) forwards; }
+.d1 { animation-delay: .02s; }
+.d2 { animation-delay: .10s; }
+.d3 { animation-delay: .18s; }
+.d4 { animation-delay: .26s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.card-title {
-  padding: 4rpx 0 12rpx;
-  font-size: 30rpx; font-weight: 600; color: var(--color-text);
+/* ========== 骨架屏 ========== */
+.sk-hero-card {
+  border-radius: 32rpx; padding: 40rpx 36rpx;
+  background: rgba(0, 122, 255, 0.10);
+}
+.sk-card {
+  margin-top: 24rpx; padding: 32rpx 28rpx; border-radius: 28rpx;
+  background: var(--color-card);
+}
+.sk {
+  border-radius: 10rpx;
+  background: linear-gradient(90deg, var(--color-fill) 25%, var(--color-fill-strong) 50%, var(--color-fill) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+.sk-label { width: 140rpx; height: 24rpx; }
+.sk-sn { width: 72%; height: 44rpx; margin-top: 20rpx; }
+.sk-tag { width: 200rpx; height: 36rpx; margin-top: 24rpx; border-radius: 999rpx; }
+.sk-title { width: 180rpx; height: 32rpx; margin-bottom: 24rpx; }
+.sk-line { height: 28rpx; margin-top: 22rpx; }
+
+/* ========== 编号头卡 ========== */
+.hero-card {
+  position: relative; overflow: hidden;
+  padding: 44rpx 36rpx; border-radius: 32rpx;
+  background: linear-gradient(150deg, #3D8BFF 0%, #007AFF 55%, #0060E0 100%);
+  box-shadow: 0 16rpx 40rpx rgba(0, 122, 255, 0.30);
+}
+.hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
+.deco-1 { width: 260rpx; height: 260rpx; top: -110rpx; right: -70rpx; background: rgba(255, 255, 255, 0.10); }
+.deco-2 { width: 140rpx; height: 140rpx; bottom: -60rpx; left: 30%; background: rgba(255, 255, 255, 0.08); }
+.sn-label { position: relative; font-size: 22rpx; color: rgba(255, 255, 255, 0.75); letter-spacing: 2rpx; }
+.sn-row { position: relative; display: flex; align-items: center; margin-top: 14rpx; }
+.sn-value {
+  flex: 1; font-size: 42rpx; font-weight: 700; color: #fff;
+  font-family: 'SF Mono', Menlo, monospace; letter-spacing: 1rpx; word-break: break-all;
+}
+.copy-btn {
+  flex-shrink: 0; margin-left: 20rpx; padding: 10rpx 26rpx; border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.22); border: 1rpx solid rgba(255, 255, 255, 0.34);
+}
+.copy-btn:active { opacity: 0.7; }
+.copy-text { font-size: 22rpx; font-weight: 500; color: #fff; }
+.meta-tags { position: relative; display: flex; flex-wrap: wrap; margin-top: 22rpx; }
+.meta-tag {
+  margin: 0 12rpx 8rpx 0; padding: 8rpx 22rpx; border-radius: 999rpx;
+  font-size: 22rpx; font-weight: 500; color: #fff;
+  background: rgba(255, 255, 255, 0.20); border: 1rpx solid rgba(255, 255, 255, 0.26);
 }
 
-.row { display: flex; align-items: flex-start; padding: 16rpx 0; }
+/* ========== 信息卡 ========== */
+.info-card {
+  margin: 24rpx 0 0; padding: 36rpx 28rpx 20rpx;
+  border-radius: 28rpx;
+  box-shadow: var(--shadow-card);
+}
+.card-title { display: flex; align-items: center; padding-bottom: 16rpx; }
+.title-bar {
+  width: 8rpx; height: 30rpx; border-radius: 4rpx; margin-right: 16rpx;
+  background: var(--color-primary);
+}
+.title-text { font-size: 30rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx; }
+
+.row {
+  display: flex; align-items: flex-start; padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--color-border);
+}
+.row:last-child { border-bottom: none; }
 .label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); }
 .value { flex: 1; font-size: 28rpx; color: var(--color-text); word-break: break-all; }
+.value.mono, .coord-value .mono { font-family: 'SF Mono', Menlo, monospace; }
+.value.empty { color: var(--color-text-tertiary); }
 
-.photos { display: flex; flex-wrap: wrap; padding-top: 8rpx; }
-.photo { width: 200rpx; height: 200rpx; margin: 0 16rpx 16rpx 0; border-radius: var(--radius); }
+/* 经纬度行 */
+.coord-value { display: flex; align-items: center; }
+.coord-value .mono { flex: 1; min-width: 0; font-size: 24rpx; }
+.locate-btn {
+  display: flex; align-items: center; flex-shrink: 0;
+  margin-left: 16rpx; padding: 10rpx 24rpx 10rpx 20rpx; border-radius: 999rpx;
+  background: rgba(0, 122, 255, 0.10);
+}
+.locate-btn:active { opacity: 0.7; }
+.locate-pin {
+  position: relative; width: 20rpx; height: 20rpx;
+  border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  background: var(--color-primary);
+  animation: pinFloat 2s ease-in-out infinite;
+}
+.locate-pin::after {
+  content: ''; position: absolute; top: 6rpx; left: 6rpx;
+  width: 8rpx; height: 8rpx; border-radius: 50%; background: #fff;
+}
+@keyframes pinFloat {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -6rpx; }
+}
+.locate-text { margin-left: 10rpx; font-size: 22rpx; font-weight: 500; color: var(--color-primary); }
 
-.actions { padding: 16rpx; }
-.btn-block { width: 100%; box-sizing: border-box; margin-bottom: 16rpx; }
+.photos { display: flex; flex-wrap: wrap; padding-top: 20rpx; }
+.photo {
+  width: 32%; height: calc((100vw - 104rpx) * 0.32);
+  margin: 0 2% 16rpx 0; border-radius: 20rpx;
+  box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.08);
+  opacity: 0; animation: fadeUp .4s ease forwards;
+  transition: transform .15s ease;
+}
+.photo:nth-child(3n) { margin-right: 0; }
+.photo:active { transform: scale(0.95); }
+
+/* ========== 底部固定操作栏 ========== */
+.action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding: 20rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--color-card);
+  box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.08);
+  border-radius: 32rpx 32rpx 0 0;
+}
+.action-row { display: flex; gap: 20rpx; }
+.bar-btn {
+  flex: 1; height: 96rpx; line-height: 96rpx; padding: 0;
+  border-radius: 999rpx; font-size: 30rpx; font-weight: 600;
+  border: none; transition: transform .15s ease, opacity .15s ease;
+}
+.bar-btn::after { border: none; }
+.bar-btn:active { transform: scale(0.97); }
+.btn-debug {
+  color: var(--color-primary); background: var(--color-fill);
+  border: none;
+}
+.btn-edit {
+  color: #fff;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  box-shadow: 0 12rpx 28rpx rgba(0, 122, 255, 0.32);
+}
+.bar-btn.off { opacity: 0.4; box-shadow: none; }
 
 .tip {
-  display: block; padding: 16rpx 0; text-align: center;
-  font-size: 26rpx; color: var(--color-text-secondary);
+  display: block; padding: 4rpx 0 14rpx; text-align: center;
+  font-size: 24rpx; color: var(--color-text-secondary);
 }
+
+/* ========== 深色模式补丁 ========== */
+.page.dark .hero-card {
+  background: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%);
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.5);
+}
+.page.dark .info-card { box-shadow: var(--shadow-card); }
+.page.dark .sk-card { background: var(--color-card); }
+.page.dark .sk-hero-card { background: rgba(10, 132, 255, 0.10); }
+.page.dark .action-bar { background: var(--color-card); box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.5); }
+.page.dark .btn-debug { background: var(--color-fill); }
+.page.dark .locate-btn { background: rgba(10, 132, 255, 0.16); }
+.page.dark .btn-edit { background: linear-gradient(135deg, #1A7AFF, #0A84FF); box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.5); }
 </style>
 
 <script type="application/json">

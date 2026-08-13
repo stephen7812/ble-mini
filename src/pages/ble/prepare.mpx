@@ -1,13 +1,50 @@
 <template>
   <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">连接设备</view>
+    <!-- 头图：蓝牙标识 + 主题开关 -->
+    <view class="hero anim-item d1">
+      <view class="hero-deco deco-1"></view>
+      <view class="hero-deco deco-2"></view>
+      <view class="brand">
+        <view class="brand-main">
+          <text class="brand-name">蓝牙调试</text>
+          <text class="brand-sub">连接设备 · 参数下发</text>
+        </view>
+        <view class="theme-btn" bindtap="toggleTheme">
+          <text class="theme-btn-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+        </view>
+      </view>
+      <!-- 纯 CSS 蓝牙示意：中心点 + 扩散波纹 -->
+      <view class="ble-signal">
+        <view class="ble-dot"></view>
+        <view class="ble-wave w1"></view>
+        <view class="ble-wave w2"></view>
+      </view>
+    </view>
 
-    <view class="card">
+    <!-- 连接表单：上浮叠压头图 -->
+    <view class="card form-card anim-item d2">
       <view class="field-group">
         <view class="field-label">设备编号</view>
         <view class="input-row">
-          <input class="field-input" model:value="{{deviceCode}}" placeholder="扫码或输入设备编号" placeholder-class="field-placeholder" />
-          <button class="btn-primary btn-scan-icon" bindtap="scanCode">⊞</button>
+          <view class="field-wrap {{focusField === 'code' ? 'focused' : ''}}">
+            <input
+              class="field-input"
+              model:value="{{deviceCode}}"
+              placeholder="扫码或输入设备编号"
+              placeholder-class="field-placeholder"
+              data-field="code"
+              bindfocus="onFieldFocus"
+              bindblur="onFieldBlur"
+            />
+          </view>
+          <view class="scan-btn" bindtap="scanCode">
+            <view class="scan-mini">
+              <view class="scan-c tl"></view>
+              <view class="scan-c tr"></view>
+              <view class="scan-c bl"></view>
+              <view class="scan-c br"></view>
+            </view>
+          </view>
         </view>
       </view>
 
@@ -15,10 +52,12 @@
         <view class="field-label">阀门类型</view>
         <view class="sel-grid">
           <view class="sel-option {{valveTypeIndex === 0 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="0">
+            <view class="sel-check" wx:if="{{valveTypeIndex === 0}}">✓</view>
             <text class="sel-name">先导调节阀</text>
             <text class="sel-desc">压力型</text>
           </view>
           <view class="sel-option {{valveTypeIndex === 1 ? 'sel-active' : ''}}" bindtap="setValveType" data-index="1">
+            <view class="sel-check" wx:if="{{valveTypeIndex === 1}}">✓</view>
             <text class="sel-name">智能调节阀</text>
             <text class="sel-desc">开度型</text>
           </view>
@@ -29,28 +68,45 @@
         <view class="field-label">控制模式</view>
         <view class="sel-grid">
           <view class="sel-option {{modeIndex === 0 ? 'sel-active' : ''}}" bindtap="setMode" data-index="0">
+            <view class="sel-check" wx:if="{{modeIndex === 0}}">✓</view>
             <text class="sel-name">蓝牙广播</text>
             <text class="sel-desc">通过 BLE 广播信号控制</text>
           </view>
           <view class="sel-option {{modeIndex === 1 ? 'sel-active' : ''}}" bindtap="setMode" data-index="1">
+            <view class="sel-check" wx:if="{{modeIndex === 1}}">✓</view>
             <text class="sel-name">4G/WiFi</text>
             <text class="sel-desc">通过网络远程控制</text>
           </view>
         </view>
       </view>
 
-      <button class="btn-primary btn-block" style="margin-top:24rpx" bindtap="goControl">确定</button>
+      <button class="confirm-btn" bindtap="goControl">开始调试</button>
     </view>
 
-    <view class="section-title" style="padding:24rpx 0 8rpx 16rpx">
-      <text>连接记录</text>
-      <text class="text-sm text-secondary" wx:if="{{pairedDevices.length > 0}}" bindtap="clearHistory" style="padding:8rpx 16rpx">清除</text>
+    <!-- 连接记录 -->
+    <view class="section-title anim-item d3">
+      <view class="title-left">
+        <view class="title-bar"></view>
+        <text class="title-text">连接记录</text>
+      </view>
+      <text class="clear-btn" wx:if="{{pairedDevices.length > 0}}" bindtap="clearHistory">清除</text>
     </view>
 
-    <view wx:if="{{pairedDevices.length === 0}}" class="history-empty">暂无连接记录</view>
+    <view class="history-empty anim-item d3" wx:if="{{pairedDevices.length === 0}}">
+      <view class="empty-icon">
+        <view class="ble-dot empty-dot"></view>
+        <view class="ble-wave empty-w1"></view>
+      </view>
+      <text class="empty-text">暂无连接记录</text>
+    </view>
 
     <block wx:for="{{pairedDevices}}" wx:key="deviceId">
-      <view class="card history-item" bindtap="goControlWithDevice" data-device="{{item}}">
+      <view
+        class="card history-item anim-item d3"
+        style="animation-delay: {{0.2 + index * 0.06}}s"
+        bindtap="goControlWithDevice"
+        data-device="{{item}}"
+      >
         <view class="history-dot dot-on"></view>
         <view class="history-info">
           <view class="history-top">
@@ -59,10 +115,9 @@
           </view>
         </view>
         <text class="history-time">{{item.lastSeenText}}</text>
+        <text class="history-arrow">›</text>
       </view>
     </block>
-
-    <view class="theme-toggle" bindtap="toggleTheme">{{darkMode ? '🌙' : '☀️'}}</view>
   </view>
 </template>
 
@@ -78,7 +133,15 @@ const modes = ['蓝牙广播', '4G/WiFi']
 const modeIds = ['broadcast', 'bluetooth']
 
 createPage({
-  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 1, valveTypes, modeIndex: 0, modes, darkMode: false },
+  // 阀门类型默认先导调节阀（index 0）：现场新装设备绝大多数是这个型号
+  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 0, valveTypes, modeIndex: 0, modes, darkMode: false, focusField: '' },
+
+  /** 从设备详情页进入时自动回填编号，不用现场再扫一次 */
+  onLoad(query) {
+    const sn = query && query.sn ? decodeURIComponent(query.sn) : ''
+    if (sn) this.setData({ deviceCode: sn })
+  },
+
   onShow() {
     const auth = useAuthStore()
     // 这里再判一次而不是只靠首页拦：用户可能从历史页面栈直接回到这一页。
@@ -113,17 +176,28 @@ createPage({
     this.setData({ darkMode: store.darkMode })
     this.formatDevices()
   },
+
+  onFieldFocus(e) {
+    this.setData({ focusField: e.currentTarget.dataset.field || '' })
+  },
+
+  onFieldBlur() {
+    this.setData({ focusField: '' })
+  },
+
   toggleTheme() {
     const store = useDeviceStore()
     store.toggleDarkMode()
     this.setData({ darkMode: store.darkMode })
   },
+
   formatDevices() {
     const store = useDeviceStore()
     this.setData({
       pairedDevices: (store.pairedDevices || []).slice(0, 5).map(d => ({ ...d, lastSeenText: formatTime(d.lastSeen) })),
     })
   },
+
   scanCode() {
     const that = this
     wx.scanCode({
@@ -135,6 +209,7 @@ createPage({
       fail(err) { if (err.errCode !== -1) wx.showToast({ title: '扫码失败', icon: 'none' }) },
     })
   },
+
   goControl() {
     const code = this.data.deviceCode.trim()
     if (!code) { wx.showToast({ title: '请扫码或输入设备编号', icon: 'none' }); return }
@@ -148,13 +223,16 @@ createPage({
     useDeviceStore().setCurrentDevice(device)
     wx.navigateTo({ url: '/pages/broadcast/index' })
   },
+
   goControlWithDevice(e) {
     const device = e.currentTarget.dataset.device
     useDeviceStore().setCurrentDevice(device)
     wx.navigateTo({ url: '/pages/broadcast/index' })
   },
+
   setValveType(e) { this.setData({ valveTypeIndex: Number(e.currentTarget.dataset.index) }) },
   setMode(e) { this.setData({ modeIndex: Number(e.currentTarget.dataset.index) }) },
+
   clearHistory() {
     wx.showModal({
       title: '确认清除', content: '确定清除所有连接记录？',
@@ -165,67 +243,200 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 16rpx; min-height: 100vh; position: relative; }
+.page { min-height: 100vh; position: relative; box-sizing: border-box; padding: 0 24rpx 56rpx; }
 
-.section-title {
-  font-size: 28rpx; font-weight: 600;
-  display: flex; align-items: center; justify-content: space-between;
+/* ========== 入场动画 ========== */
+.anim-item { opacity: 0; animation: fadeUp .55s cubic-bezier(.22, .9, .32, 1) forwards; }
+.d1 { animation-delay: .02s; }
+.d2 { animation-delay: .10s; }
+.d3 { animation-delay: .18s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(32rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.page.dark .section-title { color: var(--color-text-secondary); }
 
-.field-group { margin-bottom: 24rpx; }
+/* ========== 头图 ========== */
+.hero {
+  position: relative; overflow: hidden;
+  margin: 0 -24rpx; padding: 56rpx 40rpx 112rpx;
+  background: linear-gradient(150deg, #4C9AFF 0%, #007AFF 48%, #0055D4 100%);
+  border-radius: 0 0 48rpx 48rpx;
+}
+.hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
+.deco-1 { width: 320rpx; height: 320rpx; top: -130rpx; right: -80rpx; background: rgba(255, 255, 255, 0.09); }
+.deco-2 { width: 180rpx; height: 180rpx; bottom: -50rpx; left: -50rpx; background: rgba(255, 255, 255, 0.06); }
+.brand { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+.brand-main { display: flex; flex-direction: column; }
+.brand-name { font-size: 46rpx; font-weight: 700; color: #fff; letter-spacing: 3rpx; }
+.brand-sub { margin-top: 12rpx; font-size: 22rpx; color: rgba(255, 255, 255, 0.72); letter-spacing: 2rpx; }
+.theme-btn {
+  width: 64rpx; height: 64rpx; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.18); border: 1rpx solid rgba(255, 255, 255, 0.3);
+  transition: transform .2s ease;
+}
+.theme-btn:active { transform: scale(0.88) rotate(-15deg); }
+.theme-btn-icon { font-size: 30rpx; line-height: 1; }
+
+/* 蓝牙信号示意：中心点常亮，两圈波纹交替扩散 */
+.ble-signal { position: absolute; right: 64rpx; bottom: 40rpx; width: 72rpx; height: 72rpx; }
+.ble-dot {
+  position: absolute; left: 50%; top: 50%; width: 18rpx; height: 18rpx;
+  margin: -9rpx 0 0 -9rpx; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 16rpx rgba(255, 255, 255, 0.9);
+}
+.ble-wave {
+  position: absolute; left: 50%; top: 50%; border-radius: 50%;
+  border: 3rpx solid rgba(255, 255, 255, 0.6);
+  animation: bleRipple 2.4s ease-out infinite;
+}
+.ble-wave.w1 { width: 44rpx; height: 44rpx; margin: -22rpx 0 0 -22rpx; }
+.ble-wave.w2 { width: 72rpx; height: 72rpx; margin: -36rpx 0 0 -36rpx; animation-delay: 1.2s; }
+@keyframes bleRipple {
+  0% { opacity: 0.8; transform: scale(0.6); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+/* ========== 连接表单 ========== */
+.form-card {
+  position: relative; z-index: 2;
+  margin: -72rpx 8rpx 0; padding: 36rpx 28rpx 32rpx;
+  border-radius: 28rpx;
+  box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.08);
+}
+.field-group { margin-bottom: 28rpx; }
 .field-group:last-of-type { margin-bottom: 0; }
 .field-label {
   font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
-  margin-bottom: 8rpx;
+  margin-bottom: 12rpx;
 }
-.input-row { display: flex; gap: 12rpx; }
+.input-row { display: flex; gap: 16rpx; }
+.field-wrap {
+  flex: 1; border: 2rpx solid var(--color-border); border-radius: 16rpx;
+  background: var(--color-bg);
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.field-wrap.focused {
+  border-color: var(--color-primary); background: var(--color-card);
+  box-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.14);
+}
 .field-input {
-  flex: 1; height: 72rpx;
-  border: 2rpx solid var(--color-border); border-radius: var(--radius);
-  padding: 0 16rpx; font-size: 26rpx; color: var(--color-text); box-sizing: border-box;
+  height: 88rpx; padding: 0 24rpx; box-sizing: border-box;
+  font-size: 28rpx; color: var(--color-text);
 }
-.field-placeholder { color: #ccc; font-size: 24rpx; }
-.btn-scan-icon { width: 72rpx; height: 72rpx; padding: 0; font-size: 32rpx; flex-shrink: 0; line-height: 72rpx; }
+.field-placeholder { color: var(--color-text-secondary); font-size: 26rpx; }
+/* 扫码按钮：渐变方块 + 纯 CSS 四角扫码框 */
+.scan-btn {
+  width: 88rpx; height: 88rpx; border-radius: 999rpx; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.3);
+  transition: transform .15s ease;
+}
+.scan-btn:active { transform: scale(0.92); }
+.scan-mini { position: relative; width: 44rpx; height: 44rpx; }
+.scan-c { position: absolute; width: 14rpx; height: 14rpx; border-color: #fff; border-style: solid; }
+.scan-c.tl { top: 0; left: 0; border-width: 4rpx 0 0 4rpx; border-radius: 4rpx 0 0 0; }
+.scan-c.tr { top: 0; right: 0; border-width: 4rpx 4rpx 0 0; border-radius: 0 4rpx 0 0; }
+.scan-c.bl { bottom: 0; left: 0; border-width: 0 0 4rpx 4rpx; border-radius: 0 0 0 4rpx; }
+.scan-c.br { bottom: 0; right: 0; border-width: 0 4rpx 4rpx 0; border-radius: 0 0 4rpx 0; }
 
-.sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
+/* ========== 选项栅格 ========== */
+.sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
 .sel-option {
-  display: flex; flex-direction: column; align-items: center; gap: 6rpx;
-  padding: 20rpx 12rpx;
-  border: 2rpx solid var(--color-border); border-radius: var(--radius);
-  background: transparent; text-align: center;
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8rpx;
+  padding: 26rpx 12rpx;
+  border: 2rpx solid var(--color-border); border-radius: 16rpx;
+  background: var(--color-bg); text-align: center;
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
-.sel-option:active { background: var(--color-bg); }
-.sel-active { border-color: var(--color-primary); background: #e8faf0; }
-.page.dark .sel-active { background: rgba(0,255,65,0.08); }
-.sel-name { font-size: 26rpx; font-weight: 600; color: var(--color-text); }
-.sel-desc { font-size: 20rpx; color: var(--color-text-secondary); }
+.sel-option:active { opacity: 0.85; }
+.sel-active {
+  border-color: var(--color-primary); background: rgba(0, 122, 255, 0.06);
+  box-shadow: 0 6rpx 18rpx rgba(0, 122, 255, 0.12);
+}
+.sel-active .sel-name { color: var(--color-primary); }
+.sel-check {
+  position: absolute; top: -2rpx; right: -2rpx;
+  width: 36rpx; height: 36rpx; border-radius: 0 14rpx 0 16rpx;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22rpx; color: #fff;
+  background: var(--color-primary);
+}
+.sel-name { font-size: 28rpx; font-weight: 600; color: var(--color-text); }
+.sel-desc { font-size: 22rpx; color: var(--color-text-secondary); }
 
-.btn-block { width: 100%; box-sizing: border-box; }
+.confirm-btn {
+  width: 100%; height: 96rpx; line-height: 96rpx; padding: 0;
+  margin-top: 32rpx; border: none; border-radius: 999rpx;
+  font-size: 32rpx; font-weight: 600; color: #fff; letter-spacing: 3rpx;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  box-shadow: 0 12rpx 30rpx rgba(0, 122, 255, 0.32);
+  transition: transform .15s ease, opacity .15s ease;
+}
+.confirm-btn::after { border: none; }
+.confirm-btn:active { transform: scale(0.97); opacity: 0.92; }
+
+/* ========== 连接记录 ========== */
+.section-title {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 32rpx 8rpx 16rpx;
+}
+.title-left { display: flex; align-items: center; }
+.title-bar {
+  width: 8rpx; height: 30rpx; border-radius: 4rpx; margin-right: 16rpx;
+  background: var(--color-primary);
+}
+.title-text { font-size: 30rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx; }
+.clear-btn { font-size: 24rpx; color: var(--color-text-secondary); padding: 8rpx 16rpx; }
 
 .history-empty {
-  text-align: center; padding: 64rpx 0; font-size: 26rpx; color: var(--color-text-secondary);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 72rpx 0 64rpx;
 }
-.history-item {
-  display: flex; align-items: center; gap: 14rpx;
-  margin: 0 0 12rpx 0; padding: 20rpx;
+.empty-icon { position: relative; width: 72rpx; height: 72rpx; margin-bottom: 20rpx; }
+.empty-dot { background: var(--color-text-secondary); box-shadow: none; opacity: 0.5; }
+.empty-w1 {
+  width: 56rpx; height: 56rpx; margin: -28rpx 0 0 -28rpx;
+  border-color: var(--color-text-secondary); animation: none; opacity: 0.3;
 }
-.history-item:active { background: var(--color-bg); }
-.history-dot { width: 10rpx; height: 10rpx; border-radius: 50%; flex-shrink: 0; }
-.dot-on { background: var(--color-success); }
-.dot-off { background: #ddd; }
-.history-info { flex: 1; min-width: 0; }
-.history-top { display: flex; align-items: center; gap: 8rpx; }
-.history-name { font-size: 28rpx; font-weight: 600; color: var(--color-text); }
-.history-tag { font-size: 20rpx; color: var(--color-primary); background: var(--color-bg); padding: 2rpx 10rpx; border-radius: 6rpx; }
-.history-time { font-size: 22rpx; color: var(--color-text-secondary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.empty-text { font-size: 26rpx; color: var(--color-text-secondary); }
 
-.theme-toggle {
-  position: absolute; top: 24rpx; right: 24rpx; z-index: 10;
-  width: 64rpx; height: 64rpx; border-radius: 50%;
-  background: var(--color-card); box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.08);
-  display: flex; align-items: center; justify-content: center; font-size: 32rpx;
+.history-item {
+  display: flex; align-items: center; gap: 16rpx;
+  margin: 0 0 16rpx 0; padding: 26rpx 24rpx;
+  border-radius: 24rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.05);
+  transition: transform .15s ease;
 }
+.history-item:active { transform: scale(0.98); }
+.history-dot { width: 12rpx; height: 12rpx; border-radius: 50%; flex-shrink: 0; }
+.dot-on { background: var(--color-success); box-shadow: 0 0 10rpx rgba(52, 199, 89, 0.5); }
+.dot-off { background: var(--color-text-secondary); }
+.history-info { flex: 1; min-width: 0; }
+.history-top { display: flex; align-items: center; gap: 12rpx; }
+.history-name {
+  font-size: 28rpx; font-weight: 600; color: var(--color-text); font-family: 'SF Mono', Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-tag {
+  flex-shrink: 0; font-size: 20rpx; color: var(--color-primary);
+  background: rgba(0, 122, 255, 0.10); padding: 3rpx 14rpx; border-radius: 999rpx;
+}
+.history-time { font-size: 22rpx; color: var(--color-text-secondary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.history-arrow { font-size: 32rpx; color: var(--color-text-secondary); flex-shrink: 0; }
+
+/* ========== 深色模式补丁 ========== */
+.page.dark .hero { background: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%); }
+.page.dark .form-card { box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.45); }
+.page.dark .field-wrap { background: #2C2C2E; border-color: transparent; }
+.page.dark .field-wrap.focused { background: #2C2C2E; box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4); }
+.page.dark .sel-option { background: #2C2C2E; border-color: transparent; }
+.page.dark .sel-active { background: rgba(10, 132, 255, 0.14); border-color: var(--color-primary); }
+.page.dark .history-item { box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4); }
+.page.dark .history-tag { background: rgba(10, 132, 255, 0.16); }
+.page.dark .confirm-btn { background: linear-gradient(135deg, #1A7AFF, #0A84FF); box-shadow: 0 12rpx 30rpx rgba(0, 0, 0, 0.45); }
 </style>
 
 <script type="application/json">

@@ -3,30 +3,34 @@
     <!-- ========= 内容区 ========= -->
     <!-- 仪表盘 -->
     <view wx:if="{{tab === 'dashboard'}}" class="tab-content">
-      <view class="db-header">
-        <view class="db-title-row">
-          <text class="db-title-label">设备编号</text>
-          <text class="db-title">{{deviceId || '未连接'}}</text>
-        </view>
-        <view class="db-header-right">
-          <view class="db-status {{discoveryStarted ? 'db-on' : 'db-off'}}">
-            <view class="db-dot"></view>
-            <text>{{bluetoothStatus}}</text>
+      <view class="db-hero">
+        <view class="db-hero-deco hd1"></view>
+        <view class="db-hero-deco hd2"></view>
+        <view class="db-hero-top">
+          <view class="db-hero-main">
+            <text class="db-hero-label">设备编号</text>
+            <text class="db-hero-title">{{deviceId || '未连接'}}</text>
           </view>
-          <view class="theme-toggle" bindtap="toggleTheme">
-            <text wx:if="{{!darkMode}}">☀️</text>
-            <text wx:if="{{darkMode}}">🌙</text>
+          <view class="db-hero-side">
+            <view class="db-status {{discoveryStarted ? 'db-on' : 'db-off'}}">
+              <view class="db-dot"></view>
+              <text>{{bluetoothStatus}}</text>
+            </view>
+            <view class="theme-toggle" bindtap="toggleTheme">
+              <text wx:if="{{!darkMode}}">☀️</text>
+              <text wx:if="{{darkMode}}">🌙</text>
+            </view>
           </view>
         </view>
-      </view>
 
-      <button class="db-read-btn {{readStatus.isReading ? 'reading' : ''}}" bindtap="startRead" disabled="{{readStatus.isReading}}">
-        <block wx:if="{{readStatus.isReading}}">
-          <view class="db-spinner"></view>
-          <text>读取中…</text>
-        </block>
-        <text wx:else>读取设备状态</text>
-      </button>
+        <button class="db-read-btn {{readStatus.isReading ? 'reading' : ''}}" bindtap="startRead" disabled="{{readStatus.isReading}}">
+          <block wx:if="{{readStatus.isReading}}">
+            <view class="db-spinner"></view>
+            <text>读取中…</text>
+          </block>
+          <text wx:else>读取设备状态</text>
+        </button>
+      </view>
 
       <button wx:if="{{page2Failed && !readStatus.isReading}}" class="db-retry-btn" bindtap="retryPage2">
         <text class="db-retry-icon">↻</text>
@@ -44,9 +48,9 @@
         </view>
 
         <!-- 分组参数卡片 -->
-        <view wx:for="{{dashboard.groups}}" wx:key="title" class="db-group">
+        <view wx:for="{{dashboard.groups}}" wx:key="title" class="db-group anim-in" style="animation-delay: {{index * 0.08}}s">
           <view class="db-group-head">
-            <view class="db-group-bar"></view>
+            <view class="db-group-bar bar-{{index % 3}}"></view>
             <text class="db-group-title">{{item.title}}</text>
           </view>
           <view class="db-grid">
@@ -333,7 +337,21 @@
         <view class="ctrl-group">
           <view class="ctrl-row">
             <text class="ctrl-label">设备地址</text>
-            <input class="ctrl-addr" type="text" placeholder="设备编号后6位" model:value="{{configAddress}}" bindblur="onAddressBlur" />
+            <input class="ctrl-addr ctrl-addr-flex" type="text" placeholder="设备编号后6位" model:value="{{configAddress}}" bindblur="onAddressBlur" />
+            <view class="ctrl-scan-btn" bindtap="scanAddr">扫码</view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">蓝牙模式</text>
+            <view class="ctrl-mode">
+              <view class="ctrl-mode-dot {{discoveryStarted || advertiseStart ? 'on' : (advertiseReady || bleReady ? 'ready' : '')}}"></view>
+              <text class="ctrl-mode-text">{{bleMode}}</text>
+            </view>
+          </view>
+          <view class="ctrl-divider"></view>
+          <view class="ctrl-row">
+            <text class="ctrl-label">工作状态</text>
+            <text class="ctrl-workstatus {{statusColorClass}}">{{bluetoothStatus}}</text>
           </view>
           <view class="ctrl-divider"></view>
           <view class="ctrl-row">
@@ -343,8 +361,11 @@
             </picker>
           </view>
           <view class="ctrl-divider"></view>
-          <view class="ctrl-row" style="justify-content:flex-end;border:none">
-            <button class="ctrl-set-btn ctrl-set-btn-danger" bindtap="closeBleSvc">关闭蓝牙</button>
+          <view class="ctrl-init-row">
+            <view class="ctrl-init-btn {{reinitLoading ? 'loading' : ''}}" bindtap="reinitBle">
+              <view wx:if="{{reinitLoading}}" class="ctrl-init-spinner"></view>
+              <text>{{reinitLoading ? '初始化中…' : '重新初始化蓝牙'}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -359,7 +380,7 @@
       <view wx:if="{{!logs.length}}" class="hist-empty">
         <text>暂无日志</text>
       </view>
-      <view wx:for="{{logs}}" wx:key="time" class="hist-item">
+      <view wx:for="{{logs}}" wx:key="time" class="hist-item hist-{{item.dir}} anim-in" style="animation-delay: {{index * 0.04}}s">
         <view class="hist-top">
           <text class="hist-time">{{item.time}}</text>
           <view class="hist-tag {{item.dir}}">{{item.dir === 'recv' ? '接收' : '发送'}}</view>
@@ -579,6 +600,7 @@ createPage({
     deviceName: '', deviceType: '', deviceId: '', deviceIdShort: '',
     mode: 'old',
     bluetoothStatus: '待初始化', statusColorClass: 'status-default',
+    bleMode: '待初始化', reinitLoading: false,
     discoveryStarted: false, advertiseReady: false, advertiseStart: false, bleReady: false,
     cmdLoading: false,
     configAddress: '', configChannel: 0, channels,
@@ -657,6 +679,17 @@ createPage({
   updateStatus(text, cls) {
     this.setData({ bluetoothStatus: text, statusColorClass: cls || '' })
   },
+  // 根据广播/监听/就绪状态推导「蓝牙模式」，供蓝牙配置区实时展示
+  syncBleMode() {
+    const { advertiseStart, advertiseReady, discoveryStarted, bleReady } = this.data
+    let mode
+    if (advertiseStart && discoveryStarted) mode = '广播 + 监听'
+    else if (advertiseStart) mode = '广播中'
+    else if (discoveryStarted) mode = '监听中'
+    else if (advertiseReady || bleReady) mode = '待机（服务就绪）'
+    else mode = '待初始化'
+    this.setData({ bleMode: mode })
+  },
   initBluetooth() {
     this.updateStatus('初始化蓝牙...', 'status-loading')
     wx.openBluetoothAdapter({
@@ -675,6 +708,7 @@ createPage({
       powerLevel: 'high',
       success: () => {
         this.setData({ discoveryStarted: true })
+        this.syncBleMode()
         this.onBLEFound()
       }
     })
@@ -683,12 +717,14 @@ createPage({
     if (this.data.discoveryStarted) {
       wx.stopBluetoothDevicesDiscovery({ fail: () => {} })
       this.setData({ discoveryStarted: false })
+      this.syncBleMode()
     }
   },
   initAdvertiseServer() {
     wx.createBLEPeripheralServer().then(res => {
       this._bleServer = res.server
       this.setData({ advertiseReady: true })
+      this.syncBleMode()
     }).catch(() => {})
   },
   onBLEFound() {
@@ -869,6 +905,7 @@ createPage({
       powerLevel: 'high',
     })).then(() => {
       this.setData({ advertiseStart: true })
+      this.syncBleMode()
       // 只广播 AD_DURATION(400ms) 后即停，并触发 callback（在 loopPageX 里 callback 负责装配重试定时器）。
       setTimeout(() => {
         this.stopAdvertising()
@@ -879,6 +916,7 @@ createPage({
   // 停止广播。返回 Promise，便于 sendRaw 在「停止完成后」再发起新广播（消除 stop/start 竞态）。
   stopAdvertising() {
     this.setData({ advertiseStart: false })
+    this.syncBleMode()
     if (this._bleServer) {
       return this._bleServer.stopAdvertising().catch(() => {})
     }
@@ -1027,8 +1065,28 @@ createPage({
     this.execCmd('setPressureThreshold', null, [i, r])
   },
   // 分时压力：总使能 / 每段开关 / 时间 / 压力
-  onPsEnableToggle(e) { this.setData({ p_psEnable: e.detail.value }) },
-  onSlotToggle(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].on`]: e.detail.value }) },
+  // 分时压力总开关：关闭时把下面所有分时开关一起关掉；开启时保持子开关现状
+  onPsEnableToggle(e) {
+    const on = !!e.detail.value
+    const patch = { p_psEnable: on }
+    if (!on) {
+      this.data.p_slots.forEach((s, i) => { patch[`p_slots[${i}].on`] = false })
+    }
+    this.setData(patch)
+  },
+  // 分时开关：只要有一个子分时被打开，总开关就自动跟着开启；全部关掉时总开关也一起关闭
+  onSlotToggle(e) {
+    const idx = e.currentTarget.dataset.idx
+    const on = !!e.detail.value
+    const patch = { [`p_slots[${idx}].on`]: on }
+    if (on) {
+      patch.p_psEnable = true
+    } else {
+      const anyOn = this.data.p_slots.some((s, i) => i !== idx && s.on)
+      if (!anyOn) patch.p_psEnable = false
+    }
+    this.setData(patch)
+  },
   onSlotTime(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].time`]: e.detail.value }) },
   onSlotKpa(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].kpa`]: e.detail.value }) },
   sendTimePressure() {
@@ -1098,7 +1156,7 @@ createPage({
     wx.setStorageSync('channel', channels[idx])
   },
   onAddressBlur(e) {
-    const addr = (e.detail.value || '').replace(/\s+/g, '').toLowerCase()
+    const addr = (e.detail.value || '').toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 10)
     this.setData({ configAddress: addr })
     if (addr.length >= 6 && addr.length <= 10) wx.setStorageSync('address', addr)
   },
@@ -1157,23 +1215,62 @@ createPage({
       wx.showToast({ icon: 'none', title: err.message })
     })
   },
-  closeBleSvc() {
-    if (this._bleServer) {
-      this._bleServer.stopAdvertising().catch(() => {})
-      this._bleServer.close().then(() => {
-        this._bleServer = null
-        this._bleReady = false
-        this.setData({ bleReady: false })
-      }).catch(() => {
-        this._bleServer = null
-        this._bleReady = false
-        this.setData({ bleReady: false })
+  // 扫码取设备编号后6位填入地址，并重新初始化蓝牙
+  scanAddr() {
+    const that = this
+    wx.scanCode({
+      onlyFromCamera: false,
+      success(res) {
+        const raw = (res.result || '').trim()
+        if (!raw) { wx.showToast({ icon: 'none', title: '未识别到二维码内容' }); return }
+        // 地址为 16 进制(6位)，只取扫描结果里的十六进制字符的最后6位
+        const hex = raw.toLowerCase().match(/[0-9a-f]/g) || []
+        const addr = hex.slice(-6).join('')
+        if (addr.length < 6) { wx.showToast({ icon: 'none', title: '未识别到有效的设备编号' }); return }
+        that.setData({ configAddress: addr })
+        wx.setStorageSync('address', addr)
+        wx.showToast({ icon: 'success', title: '已填入编号后6位' })
+        that.reinitBle()
+      },
+      fail() { /* 用户取消，静默不提示 */ }
+    })
+  },
+  // 重新初始化蓝牙：先停掉广播/扫描并关闭旧 server，再重建；过程中状态栏与模式实时可见变化
+  reinitBle() {
+    if (this.data.reinitLoading) return
+    this.setData({ reinitLoading: true, bluetoothStatus: '重新初始化中...', statusColorClass: 'status-processing' })
+    this.clearTimer()
+    this.stopAdvertising()
+    this.stopDiscovery()
+    const srv = this._bleServer
+    this._bleServer = null
+    this._bleReady = false
+    this.setData({ advertiseReady: false, advertiseStart: false, bleReady: false })
+    this.syncBleMode()
+    const finish = (ok, msg, cls) => {
+      this.setData({ reinitLoading: false })
+      this.updateStatus(msg, cls)
+      this.syncBleMode()
+    }
+    const rebuild = () => {
+      wx.openBluetoothAdapter({
+        success: () => {
+          this.initDiscovery()
+          this.initAdvertiseServer()
+          finish(true, '蓝牙已重新初始化', 'status-success')
+        },
+        fail: () => finish(false, '请开启蓝牙', 'status-error')
       })
     }
-    wx.showToast({ title: '蓝牙已关闭' })
+    if (srv) {
+      srv.stopAdvertising().catch(() => {}).then(() => {
+        srv.close().catch(() => {}).then(rebuild)
+      }).catch(rebuild)
+    } else {
+      rebuild()
+    }
   },
-  execCmd(cmdKey, confirmMsg, params) {
-    if (confirmMsg) {
+  execCmd(cmdKey, confirmMsg, params) {    if (confirmMsg) {
       const that = this
       wx.showModal({ title: '确认', content: confirmMsg, success(r) {
         if (r.confirm) that.execCmd(cmdKey, null, params)
@@ -1211,33 +1308,33 @@ createPage({
    THEME:  SPRING (light, default)
    ================================================================ */
 .app {
-  --bg: #F5F7F0;
+  --bg: #F2F2F7;
   --surface: #FFFFFF;
-  --surface-alt: #EDF2E8;
-  --border: #DCE3D4;
-  --label: #2D3A2D;
-  --secondary: #4A5D4A;
-  --tertiary: #8A9A8A;
-  --spring-green: #6BAA5E;
-  --spring-green-dim: #8FC883;
-  --spring-green-bright: #4F9A42;
-  --sky: #7BB8D9;
-  --sky-bright: #5AA3CC;
-  --warm-orange: #E8A87C;
-  --warm-coral: #D4896B;
-  --rose: #D4A0A0;
-  --gold: #C9A84C;
-  --card-shadow: 0 2rpx 14rpx rgba(45,58,45,0.07);
-  --radius-sm: 10rpx;
-  --radius: 14rpx;
-  --radius-lg: 20rpx;
+  --surface-alt: #E9E9ED;
+  --border: #E5E5EA;
+  --label: #1C1C1E;
+  --secondary: #4A4A4F;
+  --tertiary: #8E8E93;
+  --spring-green: #34C759;
+  --spring-green-dim: #30D158;
+  --spring-green-bright: #28A745;
+  --sky: #7AB8FF;
+  --sky-bright: #0A84FF;
+  --warm-orange: #FF9500;
+  --warm-coral: #FF3B30;
+  --rose: #FF2D55;
+  --gold: #FFD60A;
+  --card-shadow: 0 4rpx 24rpx rgba(0,0,0,0.05);
+  --radius-sm: 12rpx;
+  --radius: 20rpx;
+  --radius-lg: 28rpx;
   --font-mono: 'SF Mono', 'Menlo', monospace;
-  --tag-send-bg: rgba(107,170,94,0.12);
-  --tag-send-color: var(--spring-green);
-  --tag-recv-bg: rgba(90,163,204,0.12);
+  --tag-send-bg: rgba(52,199,89,0.12);
+  --tag-send-color: #28A745;
+  --tag-recv-bg: rgba(10,132,255,0.12);
   --tag-recv-color: var(--sky-bright);
-  --tabbar-bg: rgba(255,255,255,0.92);
-  --tabbar-border: var(--border);
+  --tabbar-bg: rgba(249,249,252,0.92);
+  --tabbar-border: rgba(60,60,67,0.12);
   --ctrl-bg: var(--surface);
   --input-bg: var(--surface-alt);
 
@@ -1250,32 +1347,32 @@ createPage({
    THEME:  HACKER (dark)
    ================================================================ */
 .app.dark {
-  --bg: #0A0A0F;
-  --surface: #12121E;
-  --surface-alt: #1A1A2E;
-  --border: #1E1E35;
-  --label: #E0E0E0;
-  --secondary: #A0A0B0;
-  --tertiary: #606080;
-  --spring-green: #00FF41;
-  --spring-green-dim: #00CC33;
-  --spring-green-bright: #00FF41;
-  --sky: #00D4FF;
-  --sky-bright: #00B8E6;
-  --warm-orange: #FF9F1C;
-  --warm-coral: #FF6B6B;
-  --rose: #FF6BCB;
-  --gold: #FFD700;
-  --card-shadow: 0 0 16rpx rgba(0,255,65,0.08);
-  --radius-sm: 10rpx;
-  --radius: 14rpx;
-  --radius-lg: 20rpx;
+  --bg: #000000;
+  --surface: #1C1C1E;
+  --surface-alt: #2C2C2E;
+  --border: #38383A;
+  --label: #F2F2F7;
+  --secondary: #98989F;
+  --tertiary: #636366;
+  --spring-green: #30D158;
+  --spring-green-dim: #30D158;
+  --spring-green-bright: #30D158;
+  --sky: #409CFF;
+  --sky-bright: #0A84FF;
+  --warm-orange: #FF9F0A;
+  --warm-coral: #FF453A;
+  --rose: #FF375F;
+  --gold: #FFD60A;
+  --card-shadow: 0 4rpx 24rpx rgba(0,0,0,0.5);
+  --radius-sm: 12rpx;
+  --radius: 20rpx;
+  --radius-lg: 28rpx;
   --font-mono: 'SF Mono', 'Menlo', 'Courier New', monospace;
-  --tag-send-bg: rgba(0,255,65,0.1);
+  --tag-send-bg: rgba(48,209,88,0.15);
   --tag-send-color: var(--spring-green);
-  --tag-recv-bg: rgba(0,212,255,0.1);
+  --tag-recv-bg: rgba(10,132,255,0.15);
   --tag-recv-color: var(--sky-bright);
-  --tabbar-bg: rgba(10,10,15,0.95);
+  --tabbar-bg: rgba(28,28,30,0.95);
   --tabbar-border: var(--border);
   --ctrl-bg: var(--surface);
   --input-bg: var(--surface-alt);
@@ -1285,7 +1382,7 @@ createPage({
 .app.dark .ctrl-btn,
 .app.dark .ctrl-group,
 .app.dark .hist-item {
-  border: 1rpx solid rgba(0,255,65,0.06);
+  border: 1rpx solid rgba(255,255,255,0.06);
 }
 
 /* ======================= SHARED ========================== */
@@ -1344,12 +1441,12 @@ createPage({
   border-radius: 30rpx;
 }
 .db-on {
-  background: rgba(107,170,94,0.12);
+  background: rgba(52,199,89,0.12);
   color: var(--spring-green);
 }
 .app.dark .db-on {
-  background: rgba(0,255,65,0.08);
-  box-shadow: 0 0 8rpx rgba(0,255,65,0.15);
+  background: rgba(48,209,88,0.10);
+  box-shadow: 0 0 8rpx rgba(48,209,88,0.15);
 }
 .db-off {
   background: rgba(142,142,147,0.12);
@@ -1367,8 +1464,8 @@ createPage({
 .db-read-btn {
   width: 100%;
   height: 96rpx;
-  background: linear-gradient(135deg, var(--spring-green) 0%, var(--sky-bright) 100%);
-  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  border-radius: 999rpx;
   font-size: 30rpx;
   font-weight: 700;
   color: #FFF;
@@ -1376,16 +1473,15 @@ createPage({
   align-items: center;
   justify-content: center;
   margin-bottom: 28rpx;
-  box-shadow: 0 4rpx 20rpx rgba(79,154,66,0.3);
+  box-shadow: 0 8rpx 24rpx rgba(0,122,255,0.3);
   border: none;
   letter-spacing: 2rpx;
 }
 .app.dark .db-read-btn {
-  background: linear-gradient(135deg, #003300 0%, #001a33 100%);
-  border: 1rpx solid var(--spring-green);
-  box-shadow: 0 0 20rpx rgba(0,255,65,0.15), inset 0 0 20rpx rgba(0,255,65,0.03);
-  color: var(--spring-green);
-  font-family: var(--font-mono);
+  background: linear-gradient(135deg, #1A7AFF 0%, #0A84FF 60%, #0055D4 100%);
+  border: 1rpx solid rgba(10,132,255,0.4);
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.4);
+  color: #FFF;
   letter-spacing: 3rpx;
 }
 .db-read-btn:active {
@@ -1393,7 +1489,7 @@ createPage({
   transform: scale(0.98);
 }
 .app.dark .db-read-btn:active {
-  box-shadow: 0 0 30rpx rgba(0,255,65,0.25);
+  box-shadow: 0 0 30rpx rgba(10,132,255,0.25);
 }
 .db-read-btn.reading {
   gap: 14rpx;
@@ -1408,8 +1504,8 @@ createPage({
   animation: db-spin 0.7s linear infinite;
 }
 .app.dark .db-spinner {
-  border: 4rpx solid rgba(0,255,65,0.25);
-  border-top-color: var(--spring-green);
+  border: 4rpx solid rgba(255,255,255,0.25);
+  border-top-color: #FFF;
 }
 @keyframes db-spin {
   to { transform: rotate(360deg); }
@@ -1468,7 +1564,7 @@ createPage({
   box-shadow: var(--card-shadow);
   overflow: hidden;
 }
-.app.dark .db-group { border: 1rpx solid rgba(0,255,65,0.06); }
+.app.dark .db-group { border: 1rpx solid rgba(255,255,255,0.06); }
 /* 标题行：短色条 + 标题，色条只在标题左侧（不再贯穿整个模块） */
 .db-group-head { display: flex; align-items: center; margin-bottom: 16rpx; }
 .db-group-bar {
@@ -1504,9 +1600,9 @@ createPage({
 .db-ts-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
 .db-ts-head .db-group-head { margin-bottom: 0; }
 .db-ts-badge { font-size: 20rpx; padding: 5rpx 18rpx; border-radius: 20rpx; font-weight: 600; }
-.db-ts-badge.on { background: rgba(107,170,94,0.15); color: var(--spring-green-bright); }
+.db-ts-badge.on { background: rgba(52,199,89,0.15); color: var(--spring-green-bright); }
 .db-ts-badge.off { background: var(--surface-alt); color: var(--tertiary); }
-.app.dark .db-ts-badge.on { background: rgba(0,255,65,0.1); color: var(--spring-green); }
+.app.dark .db-ts-badge.on { background: rgba(48,209,88,0.15); color: var(--spring-green); }
 .db-ts-list {
   display: flex; flex-direction: column; gap: 1rpx;
   background: var(--border); border: 1rpx solid var(--border);
@@ -1748,46 +1844,66 @@ createPage({
 .app.dark .ctrl-addr {
   border: 1rpx solid var(--border);
 }
-.ctrl-set-btn {
-  height: 58rpx;
-  padding: 0 22rpx;
-  background: var(--spring-green);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #FFF;
+.ctrl-addr-flex { flex: 1; width: auto; }
+.ctrl-scan-btn {
   flex-shrink: 0;
-  min-width: 84rpx;
-  text-align: center;
+  height: 64rpx; padding: 0 28rpx;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
+  color: #FFF;
+  font-size: 26rpx; font-weight: 600;
+  box-shadow: 0 6rpx 16rpx rgba(0,122,255,0.28);
+  transition: transform .15s ease, opacity .15s ease;
 }
-.app.dark .ctrl-set-btn {
-  background: transparent;
-  border: 1rpx solid var(--spring-green);
-  color: var(--spring-green);
-  font-family: var(--font-mono);
-  letter-spacing: 1rpx;
+.ctrl-scan-btn:active { transform: scale(0.94); opacity: 0.85; }
+.app.dark .ctrl-scan-btn {
+  background: rgba(10,132,255,0.16);
+  border: 1rpx solid rgba(10,132,255,0.45);
+  color: #6FB1FF;
+  box-shadow: none;
 }
-.ctrl-set-btn:active {
-  opacity: 0.75;
-  transform: scale(0.96);
-}
-.ctrl-set-btn-secondary {
+.ctrl-init-row { display: flex; padding: 20rpx; }
+.ctrl-init-btn {
+  flex: 1; height: 88rpx;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999rpx;
   background: var(--surface-alt);
-  color: var(--spring-green);
+  border: 1rpx solid var(--border);
+  color: var(--label);
+  font-size: 28rpx; font-weight: 600; letter-spacing: 1rpx;
+  transition: transform .15s ease, opacity .15s ease;
 }
-.app.dark .ctrl-set-btn-secondary {
-  border-color: var(--sky);
-  color: var(--sky);
+.ctrl-init-btn:active { transform: scale(0.97); opacity: 0.8; }
+.app.dark .ctrl-init-btn {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--label);
 }
-.ctrl-set-btn-danger {
-  background: var(--surface-alt);
-  color: var(--warm-coral);
+.ctrl-init-btn.loading { opacity: 0.75; }
+.ctrl-init-spinner {
+  width: 30rpx; height: 30rpx; margin-right: 14rpx;
+  border: 4rpx solid var(--border);
+  border-top-color: var(--sky-bright);
+  border-radius: 50%;
+  animation: ctrl-spin 0.7s linear infinite;
 }
-.app.dark .ctrl-set-btn-danger {
-  border-color: var(--warm-coral);
-  color: var(--warm-coral);
-}
+@keyframes ctrl-spin { to { transform: rotate(360deg); } }
+
+.ctrl-mode { display: flex; align-items: center; justify-content: center; gap: 12rpx; flex: 1; min-width: 180rpx; height: 64rpx; background: var(--input-bg); border-radius: var(--radius-sm); padding: 0 14rpx; }
+.ctrl-mode-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: var(--tertiary); }
+.ctrl-mode-dot.on { background: #34C759; box-shadow: 0 0 8rpx rgba(52,199,89,0.6); }
+.ctrl-mode-dot.ready { background: #FF9F0A; box-shadow: 0 0 8rpx rgba(255,159,10,0.5); }
+.ctrl-mode-text { font-size: 26rpx; color: var(--label); font-weight: 500; }
+
+.ctrl-workstatus { flex: 1; min-width: 180rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; background: var(--input-bg); border-radius: var(--radius-sm); padding: 0 14rpx; font-size: 26rpx; font-weight: 500; }
+.ctrl-workstatus.status-success { color: #34C759; }
+.ctrl-workstatus.status-error { color: #FF3B30; }
+.ctrl-workstatus.status-processing,
+.ctrl-workstatus.status-loading { color: #FF9F0A; }
+.ctrl-workstatus.status-default { color: var(--tertiary); }
+.app.dark .ctrl-mode,
+.app.dark .ctrl-workstatus { border: 1rpx solid var(--border); }
 .ctrl-divider {
   height: 1rpx;
   background: var(--border);
@@ -1891,7 +2007,7 @@ createPage({
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 .app.dark .tabbar {
-  border-top: 1rpx solid rgba(0,255,65,0.12);
+  border-top: 1rpx solid rgba(255,255,255,0.08);
 }
 .tabbar-item {
   display: flex;
@@ -1911,11 +2027,133 @@ createPage({
 }
 .tabbar-active .tabbar-icon,
 .tabbar-active .tabbar-label {
-  color: var(--spring-green);
+  color: var(--sky-bright);
 }
 .app.dark .tabbar-active .tabbar-icon,
 .app.dark .tabbar-active .tabbar-label {
-  text-shadow: 0 0 8rpx rgba(0,255,65,0.4);
+  text-shadow: 0 0 8rpx rgba(10,132,255,0.5);
+}
+
+/* ======================= 视觉升级（辨识度 / 层次感） ========================== */
+
+/* 错峰入场 */
+.anim-in { opacity: 0; animation: bcFadeUp .5s cubic-bezier(.22, .9, .32, 1) forwards; }
+@keyframes bcFadeUp {
+  from { opacity: 0; transform: translateY(24rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 仪表盘头图 ---------- */
+.db-hero {
+  position: relative; overflow: hidden;
+  margin: -24rpx -20rpx 28rpx; padding: 48rpx 36rpx 44rpx;
+  background: linear-gradient(150deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
+  border-radius: 0 0 36rpx 36rpx;
+}
+.app.dark .db-hero {
+  background: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 60%, #0040B0 100%);
+  border-bottom: 1rpx solid rgba(10,132,255,0.15);
+}
+.db-hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
+.db-hero-deco.hd1 { width: 300rpx; height: 300rpx; top: -130rpx; right: -70rpx; background: rgba(255,255,255,0.09); }
+.db-hero-deco.hd2 { width: 160rpx; height: 160rpx; bottom: -60rpx; left: -30rpx; background: rgba(255,255,255,0.06); }
+.db-hero-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+.db-hero-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.db-hero-label { font-size: 22rpx; color: rgba(255,255,255,0.72); letter-spacing: 2rpx; }
+.db-hero-title {
+  margin-top: 10rpx; font-size: 40rpx; font-weight: 700; color: #fff;
+  font-family: var(--font-mono); letter-spacing: 1rpx; word-break: break-all;
+}
+.db-hero-side { display: flex; align-items: center; flex-shrink: 0; margin-left: 20rpx; }
+.db-hero .db-status { background: rgba(255,255,255,0.16); color: #fff; }
+.db-hero .db-status.db-off { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.78); }
+.db-hero .db-dot { background: #fff; }
+.db-hero .db-on .db-dot { animation: heroDotPulse 1.8s ease-in-out infinite; }
+@keyframes heroDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.5); }
+  60% { box-shadow: 0 0 0 10rpx rgba(255,255,255,0); }
+}
+.db-hero .theme-toggle { background: rgba(255,255,255,0.18); border: 1rpx solid rgba(255,255,255,0.3); }
+
+/* ---------- 分组色条：压力=蓝 / 阀位=绿 / 设备=金，按序循环 ---------- */
+.db-group-bar.bar-0 { background: linear-gradient(180deg, var(--sky-bright), var(--sky)); }
+.db-group-bar.bar-1 { background: linear-gradient(180deg, var(--spring-green-bright), var(--spring-green)); }
+.db-group-bar.bar-2 { background: linear-gradient(180deg, var(--gold), var(--warm-orange)); }
+
+/* 参数单元格：数值更挺、行距更松 */
+.db-cell { gap: 8rpx; padding: 22rpx 20rpx; }
+.db-cell-val { font-size: 34rpx; }
+
+/* 告警图标呼吸脉冲，现场余光可见 */
+.db-alert-icon { animation: alertPulse 1.6s ease-in-out infinite; }
+@keyframes alertPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,49,65,0.35); }
+  60% { box-shadow: 0 0 0 12rpx rgba(255,49,65,0); }
+}
+
+/* ---------- 控制页：快速操作图标化 ---------- */
+.ctrl-btn { border-radius: 20rpx; padding: 32rpx 8rpx; }
+.ctrl-btn-icon {
+  width: 76rpx; height: 76rpx; line-height: 76rpx;
+  border-radius: 50%; text-align: center;
+}
+.ctrl-open .ctrl-btn-icon { background: rgba(52,199,89,0.14); }
+.ctrl-close .ctrl-btn-icon { background: rgba(255,59,48,0.12); }
+.ctrl-reset .ctrl-btn-icon { background: rgba(255,149,0,0.14); line-height: 68rpx; }
+.app.dark .ctrl-open .ctrl-btn-icon { background: rgba(48,209,88,0.14); }
+.app.dark .ctrl-close .ctrl-btn-icon { background: rgba(255,69,58,0.14); }
+.app.dark .ctrl-reset .ctrl-btn-icon { background: rgba(255,159,10,0.14); }
+
+/* 参数卡：左侧色边建立视觉锚点 */
+.pf-field { border-radius: 20rpx; border-left: 6rpx solid rgba(0,122,255,0.35); }
+.app.dark .pf-field { border-left-color: rgba(10,132,255,0.25); }
+
+/* 设定按钮：渐变胶囊，页面内统一主行动作 */
+.pf-btn {
+  height: 64rpx; border-radius: 999rpx;
+  background: linear-gradient(135deg, #3D8BFF, #007AFF);
+  box-shadow: 0 4rpx 12rpx rgba(0,122,255,0.25);
+}
+
+/* ---------- 历史记录：收发方向色条 + 十六进制代码块 ---------- */
+.hist-item { border-left: 6rpx solid transparent; padding: 20rpx 24rpx; }
+.hist-item.hist-send { border-left-color: var(--spring-green); }
+.hist-item.hist-recv { border-left-color: var(--sky-bright); }
+.hist-tag { border-radius: 999rpx; }
+.hist-copy { border-radius: 999rpx; color: var(--spring-green); }
+.hist-hex {
+  display: block; margin-top: 4rpx;
+  background: var(--surface-alt); border-radius: 8rpx; padding: 10rpx 14rpx;
+}
+.app.dark .hist-hex { background: rgba(0,0,0,0.3); }
+
+/* ---------- 底部页签：选中项药丸高亮 ---------- */
+.tabbar-item { border-radius: 999rpx; padding: 10rpx 32rpx; }
+.tabbar-active { background: rgba(0,122,255,0.12); }
+.app.dark .tabbar-active { background: rgba(10,132,255,0.16); }
+
+/* ---------- 读取按钮：收进头图，白底绿字胶囊 ---------- */
+.db-hero .db-read-btn {
+  height: 88rpx; margin: 36rpx 0 0; border-radius: 999rpx;
+  background: #fff; color: #007AFF;
+  font-size: 30rpx; font-weight: 700; letter-spacing: 4rpx;
+  box-shadow: 0 10rpx 28rpx rgba(0,0,0,0.18);
+  transition: transform .15s ease, opacity .15s ease;
+}
+.db-hero .db-read-btn:active { transform: scale(0.97); opacity: 0.92; }
+.db-hero .db-read-btn.reading { opacity: 0.85; }
+.db-hero .db-spinner {
+  border-color: rgba(0,122,255,0.3);
+  border-top-color: #007AFF;
+}
+.app.dark .db-hero .db-read-btn {
+  background: rgba(10,132,255,0.12); color: #0A84FF;
+  border: 1rpx solid rgba(10,132,255,0.4);
+  box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.35);
+}
+.app.dark .db-hero .db-spinner {
+  border-color: rgba(10,132,255,0.3);
+  border-top-color: #0A84FF;
 }
 </style>
 
