@@ -121,11 +121,11 @@
         <view class="param-item">
           <text class="param-label">目标压力</text>
           <view class="input-row">
-            <input class="param-input" type="digit" model:value="{{p_pressure}}" placeholder="0~250" />
-            <text class="param-unit">KPa</text>
+            <input class="param-input" type="digit" model:value="{{p_pressure}}" placeholder="0~0.25" />
+            <text class="param-unit">MPa</text>
             <button class="btn-send" bindtap="execTargetPressure">
               <text class="cmd-name">设定</text>
-              <text class="cmd-hex">{{cmdHexArgs('setTargetPressure',Math.round(Number(p_pressure||0)/10))}}</text>
+              <text class="cmd-hex">{{cmdHexArgs('setTargetPressure',Math.round(Number(p_pressure||0)*100))}}</text>
             </button>
           </view>
         </view>
@@ -297,10 +297,10 @@ createPage({
   buildFields(data) {
     if (this.data.valveTypeId === 'new') {
       return [
-        { label: '进水压力', value: (data.inletPressure || 0) + ' KPa' },
-        { label: '回水压力', value: (data.returnPressure || 0) + ' KPa' },
-        { label: '设定压力', value: (data.setPressure || 0) + ' KPa', primary: true },
-        { label: '进水补偿', value: (data.inletCompensation ?? 0) + ' KPa' },
+        { label: '进水压力', value: ((data.inletPressure || 0) / 1000).toFixed(3) + ' MPa' },
+        { label: '回水压力', value: ((data.returnPressure || 0) / 1000).toFixed(3) + ' MPa' },
+        { label: '设定压力', value: ((data.setPressure || 0) / 1000).toFixed(3) + ' MPa', primary: true },
+        { label: '进水补偿', value: ((data.inletCompensation ?? 0) / 1000).toFixed(3) + ' MPa' },
         { label: '阀门圈数', value: data.valvePosition ?? '-' },
         { label: '设定圈数', value: data.targetPosition ?? '-' },
         { label: '采样周期', value: (data.sampleCycle || 0) + '分' },
@@ -358,8 +358,9 @@ createPage({
     this.sendCmd('setWorkMode', '设定模式', [workModeCodes[this.data.p_modeIdx]])
   },
   execTargetPressure() {
-    const v = Math.round(Number(this.data.p_pressure) / 10) || 0
-    if (v < 0 || v > 25) { wx.showToast({ title: '压力范围0~250KPa', icon: 'none' }); return }
+    const mpa = Number(this.data.p_pressure) || 0
+    const v = Math.round(mpa * 100)
+    if (v < 0 || v > 25) { wx.showToast({ title: '压力范围0~0.25MPa', icon: 'none' }); return }
     this.sendCmd('setTargetPressure', '设定压力', [v])
   },
   sendCmd(cmdKey, name, params) {

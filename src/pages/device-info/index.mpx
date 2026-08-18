@@ -3,14 +3,14 @@
     <view wx:if="{{valveTypeId === 'new'}}" class="card">
       <text class="text-sm font-bold mb-8">压力设置</text>
       <view class="form-item">
-        <text class="form-label">目标压力 (KPa)</text>
-        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0 ~ 2500" />
+        <text class="form-label">目标压力 (MPa)</text>
+        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0 ~ 2.5" />
       </view>
       <button class="btn-primary" bindtap="setPressure">设置压力</button>
 
       <view class="form-item mt-16">
-        <text class="form-label">进水压力补偿 (KPa)</text>
-        <input class="form-input" type="digit" model:value="{{inletComp}}" placeholder="-120 ~ 120" />
+        <text class="form-label">进水压力补偿 (MPa)</text>
+        <input class="form-input" type="digit" model:value="{{inletComp}}" placeholder="-0.12 ~ 0.12" />
       </view>
       <button class="btn-outline mt-8" bindtap="setPressureComp">设置补偿</button>
     </view>
@@ -51,7 +51,7 @@ import { pressureKPaTo10KPa } from '../../utils/convert'
 
 createPage({
   data: {
-    valveTypeId: 'old', targetPressure: '200', inletComp: '0',
+    valveTypeId: 'old', targetPressure: '0.2', inletComp: '0',
     targetOpening: 50, workModeIndex: 1,
     workModes: ['通断阀', '回水调节', '室内调节', '流量平衡', '停止'],
   },
@@ -63,14 +63,16 @@ createPage({
     this.cmds = this.protocol.commands
   },
   setPressure() {
-    const kpa = parseFloat(this.data.targetPressure)
-    if (isNaN(kpa) || kpa < 0 || kpa > 2500) { wx.showToast({ title: '无效压力值', icon: 'none' }); return }
+    const mpa = parseFloat(this.data.targetPressure)
+    if (isNaN(mpa) || mpa < 0 || mpa > 2.5) { wx.showToast({ title: '无效压力值', icon: 'none' }); return }
+    const kpa = mpa * 1000
     this.sendFrame(this.cmds.setTargetPressure(pressureKPaTo10KPa(kpa)), '设置成功')
   },
   setPressureComp() {
     if (!this.cmds.setPressureCompensation) return
-    const v = parseInt(this.data.inletComp) || 0
-    this.sendFrame(this.cmds.setPressureCompensation(v, v), '设置成功')
+    const mpa = parseFloat(this.data.inletComp) || 0
+    const kpa = Math.round(mpa * 1000)
+    this.sendFrame(this.cmds.setPressureCompensation(kpa, kpa), '设置成功')
   },
   setOpening() { this.sendFrame(this.cmds.setOpening(this.data.targetOpening), '设置成功') },
   onWorkModeChange(e) { this.setData({ workModeIndex: e.detail.value }) },
