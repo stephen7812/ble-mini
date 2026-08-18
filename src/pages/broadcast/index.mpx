@@ -2061,7 +2061,7 @@ createPage({
 .db-hero-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .db-hero-label { font-size: 22rpx; color: rgba(255,255,255,0.72); letter-spacing: 2rpx; }
 .db-hero-title {
-  margin-top: 10rpx; font-size: 40rpx; font-weight: 700; color: #fff;
+  margin-top: 10rpx; font-size: 32rpx; font-weight: 700; color: #fff;
   font-family: var(--font-mono); letter-spacing: 1rpx; word-break: break-all;
 }
 .db-hero-side { display: flex; align-items: center; flex-shrink: 0; margin-left: 20rpx; }
@@ -2147,7 +2147,7 @@ createPage({
   border-top-color: #007AFF;
 }
 .app.dark .db-hero .db-read-btn {
-  background: rgba(10,132,255,0.12); color: #0A84FF;
+  background: rgba(10,132,255,0.12); color: #fff;
   border: 1rpx solid rgba(10,132,255,0.4);
   box-shadow: 0 8rpx 24rpx rgba(0,0,0,0.35);
 }
