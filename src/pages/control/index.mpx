@@ -128,16 +128,18 @@ createPage({
   },
 
   onLoad(options) {
-    const { sn, id, name } = options
-    if (!sn || !id) {
+    const { sn, deviceId, name } = options
+    if (!sn || !deviceId) {
       wx.showToast({ title: '缺少设备参数', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 1500)
       return
     }
 
-    this.deviceSn = sn
-    this.deviceId = parseInt(id)
-    this.deviceName = name || sn
+    this.setData({
+      deviceSn: sn,
+      deviceId: parseInt(deviceId),
+      deviceName: name || sn
+    })
 
     // 加载设备当前状态
     this.loadDeviceStatus()
@@ -149,16 +151,14 @@ createPage({
     // 加载设备当前状态
     async loadDeviceStatus() {
       try {
-        const data = await getDeviceRealtime(this.deviceSn)
+        const data = await getDeviceRealtime(this.data.deviceSn)
         if (data && data.data) {
-          this.currentOpenness = data.data.openness != null ? data.data.openness : '-'
-          this.currentPressure = data.data.pressure != null ? data.data.pressure.toFixed(1) : '-'
-          this.currentTemperature = data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-'
-
-          // 初始化目标值为当前值
-          if (data.data.openness != null) {
-            this.targetOpenness = data.data.openness
-          }
+          this.setData({
+            currentOpenness: data.data.openness != null ? data.data.openness : '-',
+            currentPressure: data.data.pressure != null ? data.data.pressure.toFixed(1) : '-',
+            currentTemperature: data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-',
+            targetOpenness: data.data.openness != null ? data.data.openness : this.data.targetOpenness
+          })
         }
       } catch (e) {
         console.error('加载设备状态失败:', e)
@@ -170,7 +170,9 @@ createPage({
       try {
         const result = await getControlTaskList(1, 10)
         // 只显示当前设备的任务
-        this.taskList = (result.list || []).filter(task => task.device_sn === this.deviceSn)
+        this.setData({
+          taskList: (result.list || []).filter(task => task.device_sn === this.data.deviceSn)
+        })
       } catch (e) {
         console.error('加载操作历史失败:', e)
       }
@@ -178,39 +180,39 @@ createPage({
 
     // 开度滑块变化
     handleOpennessChange(e) {
-      this.targetOpenness = e.detail.value
+      this.setData({ targetOpenness: e.detail.value })
     },
 
     // 压力输入
     handlePressureInput(e) {
-      this.targetPressure = e.detail.value
+      this.setData({ targetPressure: e.detail.value })
     },
 
     // 温度输入
     handleTemperatureInput(e) {
-      this.targetTemperature = e.detail.value
+      this.setData({ targetTemperature: e.detail.value })
     },
 
     // 重置开度
     resetOpenness() {
-      if (this.currentOpenness !== '-') {
-        this.targetOpenness = this.currentOpenness
+      if (this.data.currentOpenness !== '-') {
+        this.setData({ targetOpenness: this.data.currentOpenness })
       }
     },
 
     // 重置压力
     resetPressure() {
-      this.targetPressure = ''
+      this.setData({ targetPressure: '' })
     },
 
     // 重置温度
     resetTemperature() {
-      this.targetTemperature = ''
+      this.setData({ targetTemperature: '' })
     },
 
     // 设置开度
     async handleSetOpenness() {
-      const openness = parseInt(this.targetOpenness)
+      const openness = parseInt(this.data.targetOpenness)
 
       // 二次确认
       const confirm = await this.showConfirm(`确定将开度调节至 ${openness}% 吗？`)
@@ -221,7 +223,7 @@ createPage({
 
     // 设置压力
     async handleSetPressure() {
-      const pressure = parseFloat(this.targetPressure)
+      const pressure = parseFloat(this.data.targetPressure)
 
       // 参数校验
       if (isNaN(pressure)) {
@@ -244,7 +246,7 @@ createPage({
 
     // 设置温度
     async handleSetTemperature() {
-      const temperature = parseFloat(this.targetTemperature)
+      const temperature = parseFloat(this.data.targetTemperature)
 
       // 参数校验
       if (isNaN(temperature)) {
@@ -268,7 +270,7 @@ createPage({
       wx.showLoading({ title: '指令下发中...', mask: true })
 
       try {
-        await sendControlCommand(this.deviceId, command, params)
+        await sendControlCommand(this.data.deviceId, command, params)
 
         wx.hideLoading()
         wx.showToast({ title: '指令下发成功', icon: 'success' })
