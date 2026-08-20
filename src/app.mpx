@@ -168,6 +168,7 @@ page {
     "./pages/device/edit",
     "./pages/ble/prepare",
     "./pages/scan/index",
+    "./pages/monitor/index",
     "./pages/control/index",
     "./pages/device-info/index",
     "./pages/broadcast/index"

@@ -1,0 +1,547 @@
+<template>
+  <view class="monitor-page">
+    <!-- 设备信息头部 -->
+    <view class="device-header">
+      <view class="device-title">
+        <text class="device-name">{{ deviceName }}</text>
+        <text class="device-sn">SN: {{ deviceSn }}</text>
+      </view>
+      <view class="device-status">
+        <view class="status-dot" :class="{ online: isOnline, offline: !isOnline }"></view>
+        <text class="status-text">{{ isOnline ? '在线' : '离线' }}</text>
+        <text class="last-report">最后上报: {{ lastReportText }}</text>
+      </view>
+    </view>
+
+    <!-- 实时数据卡片 -->
+    <view class="realtime-data" wx:if="{{ realtimeData }}">
+      <view class="section-title">实时数据</view>
+
+      <!-- 压力数据 -->
+      <view class="data-grid" wx:if="{{ hasPressure }}">
+        <view class="data-item" wx:if="{{ realtimeData.data.intake_pressure != null }}">
+          <text class="data-label">进水压力</text>
+          <text class="data-value pressure">{{ realtimeData.data.intake_pressure }}</text>
+          <text class="data-unit">MPa</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.return_pressure != null }}">
+          <text class="data-label">回水压力</text>
+          <text class="data-value pressure">{{ realtimeData.data.return_pressure }}</text>
+          <text class="data-unit">MPa</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.secondary_intake_pressure != null }}">
+          <text class="data-label">二次进水</text>
+          <text class="data-value pressure">{{ realtimeData.data.secondary_intake_pressure }}</text>
+          <text class="data-unit">MPa</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.secondary_return_pressure != null }}">
+          <text class="data-label">二次回水</text>
+          <text class="data-value pressure">{{ realtimeData.data.secondary_return_pressure }}</text>
+          <text class="data-unit">MPa</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.pressure != null && !hasPressure }}">
+          <text class="data-label">压力</text>
+          <text class="data-value pressure">{{ realtimeData.data.pressure }}</text>
+          <text class="data-unit">MPa</text>
+        </view>
+      </view>
+
+      <!-- 温度数据 -->
+      <view class="data-grid" wx:if="{{ hasTemperature }}">
+        <view class="data-item" wx:if="{{ realtimeData.data.temp_intake != null }}">
+          <text class="data-label">进水温度</text>
+          <text class="data-value temperature">{{ formatValue(realtimeData.data.temp_intake) }}</text>
+          <text class="data-unit">°C</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.temp_return != null }}">
+          <text class="data-label">回水温度</text>
+          <text class="data-value temperature">{{ formatValue(realtimeData.data.temp_return) }}</text>
+          <text class="data-unit">°C</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.temp_set != null }}">
+          <text class="data-label">设定温度</text>
+          <text class="data-value temperature">{{ formatValue(realtimeData.data.temp_set) }}</text>
+          <text class="data-unit">°C</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.temp_indoor != null }}">
+          <text class="data-label">室内温度</text>
+          <text class="data-value temperature">{{ formatValue(realtimeData.data.temp_indoor) }}</text>
+          <text class="data-unit">°C</text>
+        </view>
+      </view>
+
+      <!-- 阀门状态 -->
+      <view class="data-grid">
+        <view class="data-item" wx:if="{{ realtimeData.data.openness != null }}">
+          <text class="data-label">当前开度</text>
+          <text class="data-value openness">{{ realtimeData.data.openness }}</text>
+          <text class="data-unit">%</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.set_opening != null }}">
+          <text class="data-label">设定开度</text>
+          <text class="data-value">{{ realtimeData.data.set_opening }}</text>
+          <text class="data-unit">%</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.flow != null }}">
+          <text class="data-label">流量</text>
+          <text class="data-value flow">{{ formatValue(realtimeData.data.flow) }}</text>
+          <text class="data-unit">m³/h</text>
+        </view>
+      </view>
+
+      <!-- 设备状态 -->
+      <view class="data-grid">
+        <view class="data-item">
+          <text class="data-label">电池电量</text>
+          <text class="data-value battery" :class="getBatteryClass(realtimeData.data.battery)">
+            {{ realtimeData.data.battery != null ? realtimeData.data.battery : '-' }}
+          </text>
+          <text class="data-unit" wx:if="{{ realtimeData.data.battery != null }}">%</text>
+        </view>
+        <view class="data-item">
+          <text class="data-label">信号强度</text>
+          <text class="data-value signal" :class="getSignalClass(realtimeData.data.signal_strength)">
+            {{ realtimeData.data.signal_strength != null ? realtimeData.data.signal_strength : '-' }}
+          </text>
+          <text class="data-unit" wx:if="{{ realtimeData.data.signal_strength != null }}">dBm</text>
+        </view>
+        <view class="data-item" wx:if="{{ realtimeData.data.work_mode }}">
+          <text class="data-label">工作模式</text>
+          <text class="data-value mode">{{ realtimeData.data.work_mode }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-state" wx:if="{{ !loading && !realtimeData }}">
+      <text class="empty-text">暂无实时数据</text>
+      <text class="empty-hint">请点击刷新按钮获取</text>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="loading-state" wx:if="{{ loading }}">
+      <text>加载中...</text>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="action-bar">
+      <button class="btn-secondary" bindtap="handleRefresh" disabled="{{ loading }}">
+        🔄 {{ loading ? '刷新中...' : '刷新' }}
+      </button>
+      <button class="btn-primary" bindtap="handleControl">
+        ⚙️ 远程控制
+      </button>
+    </view>
+
+    <!-- 自动刷新设置 -->
+    <view class="auto-refresh-bar">
+      <text class="refresh-label">自动刷新</text>
+      <switch checked="{{ autoRefreshEnabled }}" bindchange="handleAutoRefreshToggle" />
+      <view class="refresh-interval" wx:if="{{ autoRefreshEnabled }}">
+        <text class="interval-label">间隔:</text>
+        <picker mode="selector" range="{{ intervalOptions }}" range-key="label" value="{{ selectedIntervalIndex }}" bindchange="handleIntervalChange">
+          <text class="interval-value">{{ intervalOptions[selectedIntervalIndex].label }}</text>
+        </picker>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { getDeviceRealtime, getDeviceBySn } from '../../services/api/tenant'
+
+createPage({
+  data: {
+    deviceSn: '',
+    deviceId: null,
+    deviceName: '',
+    realtimeData: null,
+    loading: false,
+    isOnline: false,
+    lastReportText: '-',
+    autoRefreshEnabled: false,
+    selectedIntervalIndex: 1,
+    intervalOptions: [
+      { label: '5秒', value: 5000 },
+      { label: '10秒', value: 10000 },
+      { label: '30秒', value: 30000 },
+      { label: '60秒', value: 60000 }
+    ],
+    refreshTimer: null
+  },
+
+  computed: {
+    // 是否有压力数据
+    hasPressure() {
+      if (!this.realtimeData || !this.realtimeData.data) return false
+      const d = this.realtimeData.data
+      return d.intake_pressure != null || d.return_pressure != null ||
+             d.secondary_intake_pressure != null || d.secondary_return_pressure != null ||
+             d.pressure != null
+    },
+
+    // 是否有温度数据
+    hasTemperature() {
+      if (!this.realtimeData || !this.realtimeData.data) return false
+      const d = this.realtimeData.data
+      return d.temp_intake != null || d.temp_return != null ||
+             d.temp_set != null || d.temp_indoor != null
+    }
+  },
+
+  onLoad(options) {
+    const { sn, id, name } = options
+    if (!sn) {
+      wx.showToast({ title: '缺少设备SN参数', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 1500)
+      return
+    }
+
+    this.deviceSn = sn
+    this.deviceId = id ? parseInt(id) : null
+    this.deviceName = name || sn
+
+    // 如果没有设备 ID，先查询一次获取
+    if (!this.deviceId) {
+      this.fetchDeviceInfo()
+    } else {
+      this.loadRealtimeData()
+    }
+  },
+
+  onShow() {
+    // 页面显示时，如果开启了自动刷新则启动
+    if (this.autoRefreshEnabled && !this.refreshTimer) {
+      this.startAutoRefresh()
+    }
+  },
+
+  onHide() {
+    // 页面隐藏时停止自动刷新
+    this.stopAutoRefresh()
+  },
+
+  onUnload() {
+    // 页面卸载时清理定时器
+    this.stopAutoRefresh()
+  },
+
+  methods: {
+    // 获取设备基本信息（用于获取 device_id）
+    async fetchDeviceInfo() {
+      try {
+        const device = await getDeviceBySn(this.deviceSn)
+        this.deviceId = device.id
+        this.deviceName = device.name || device.sn
+        this.loadRealtimeData()
+      } catch (e) {
+        wx.showToast({ title: e.message || '获取设备信息失败', icon: 'none' })
+      }
+    },
+
+    // 加载实时数据
+    async loadRealtimeData() {
+      this.loading = true
+      try {
+        const data = await getDeviceRealtime(this.deviceSn)
+        this.realtimeData = data
+        this.isOnline = data.online_status === 1
+        this.updateLastReportText(data.data.reported_at)
+      } catch (e) {
+        console.error('加载实时数据失败:', e)
+        wx.showToast({ title: e.message || '获取数据失败', icon: 'none' })
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 手动刷新
+    handleRefresh() {
+      this.loadRealtimeData()
+    },
+
+    // 跳转到控制页面
+    handleControl() {
+      if (!this.deviceId) {
+        wx.showToast({ title: '设备信息加载中', icon: 'none' })
+        return
+      }
+      wx.navigateTo({
+        url: `/pages/control/index?sn=${this.deviceSn}&id=${this.deviceId}&name=${encodeURIComponent(this.deviceName)}`
+      })
+    },
+
+    // 自动刷新开关切换
+    handleAutoRefreshToggle(e) {
+      this.autoRefreshEnabled = e.detail.value
+      if (this.autoRefreshEnabled) {
+        this.startAutoRefresh()
+      } else {
+        this.stopAutoRefresh()
+      }
+    },
+
+    // 刷新间隔切换
+    handleIntervalChange(e) {
+      this.selectedIntervalIndex = parseInt(e.detail.value)
+      if (this.autoRefreshEnabled) {
+        // 重新启动定时器
+        this.stopAutoRefresh()
+        this.startAutoRefresh()
+      }
+    },
+
+    // 启动自动刷新
+    startAutoRefresh() {
+      const interval = this.intervalOptions[this.selectedIntervalIndex].value
+      this.refreshTimer = setInterval(() => {
+        this.loadRealtimeData()
+      }, interval)
+    },
+
+    // 停止自动刷新
+    stopAutoRefresh() {
+      if (this.refreshTimer) {
+        clearInterval(this.refreshTimer)
+        this.refreshTimer = null
+      }
+    },
+
+    // 更新最后上报时间文本
+    updateLastReportText(timestamp) {
+      if (!timestamp) {
+        this.lastReportText = '-'
+        return
+      }
+      const now = Math.floor(Date.now() / 1000)
+      const diff = now - timestamp
+      if (diff < 60) {
+        this.lastReportText = '刚刚'
+      } else if (diff < 3600) {
+        this.lastReportText = `${Math.floor(diff / 60)}分钟前`
+      } else if (diff < 86400) {
+        this.lastReportText = `${Math.floor(diff / 3600)}小时前`
+      } else {
+        this.lastReportText = `${Math.floor(diff / 86400)}天前`
+      }
+    },
+
+    // 格式化数值（保留1位小数）
+    formatValue(value) {
+      if (value == null) return '-'
+      return Number(value).toFixed(1)
+    },
+
+    // 获取电池电量样式类
+    getBatteryClass(battery) {
+      if (battery == null) return ''
+      if (battery >= 80) return 'battery-good'
+      if (battery >= 30) return 'battery-medium'
+      return 'battery-low'
+    },
+
+    // 获取信号强度样式类
+    getSignalClass(signal) {
+      if (signal == null) return ''
+      if (signal >= -60) return 'signal-good'
+      if (signal >= -80) return 'signal-medium'
+      return 'signal-low'
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.monitor-page
+  min-height 100vh
+  background-color #f5f5f5
+  padding-bottom 100rpx
+
+.device-header
+  background-color #fff
+  padding 30rpx
+  border-bottom 1px solid #e5e5e5
+
+.device-title
+  display flex
+  align-items baseline
+  margin-bottom 20rpx
+
+.device-name
+  font-size 36rpx
+  font-weight bold
+  color #333
+  margin-right 20rpx
+
+.device-sn
+  font-size 24rpx
+  color #999
+
+.device-status
+  display flex
+  align-items center
+  font-size 26rpx
+
+.status-dot
+  width 16rpx
+  height 16rpx
+  border-radius 50%
+  margin-right 10rpx
+  &.online
+    background-color #52c41a
+  &.offline
+    background-color #999
+
+.status-text
+  color #666
+  margin-right 20rpx
+
+.last-report
+  color #999
+
+.realtime-data
+  margin-top 20rpx
+
+.section-title
+  padding 20rpx 30rpx
+  font-size 28rpx
+  font-weight bold
+  color #333
+  background-color #fff
+  border-bottom 1px solid #f0f0f0
+
+.data-grid
+  display grid
+  grid-template-columns repeat(2, 1fr)
+  gap 1px
+  background-color #f0f0f0
+  margin-bottom 20rpx
+
+.data-item
+  background-color #fff
+  padding 30rpx
+  display flex
+  flex-direction column
+  align-items center
+
+.data-label
+  font-size 24rpx
+  color #999
+  margin-bottom 15rpx
+
+.data-value
+  font-size 48rpx
+  font-weight bold
+  color #333
+  margin-bottom 5rpx
+  &.pressure
+    color #1890ff
+  &.temperature
+    color #ff7875
+  &.openness
+    color #52c41a
+  &.flow
+    color #13c2c2
+  &.battery-good
+    color #52c41a
+  &.battery-medium
+    color #faad14
+  &.battery-low
+    color #ff4d4f
+  &.signal-good
+    color #52c41a
+  &.signal-medium
+    color #faad14
+  &.signal-low
+    color #ff4d4f
+
+.data-unit
+  font-size 24rpx
+  color #999
+
+.empty-state
+  padding 200rpx 0
+  text-align center
+
+.empty-text
+  display block
+  font-size 32rpx
+  color #999
+  margin-bottom 20rpx
+
+.empty-hint
+  display block
+  font-size 24rpx
+  color #ccc
+
+.loading-state
+  padding 200rpx 0
+  text-align center
+  font-size 28rpx
+  color #999
+
+.action-bar
+  position fixed
+  bottom 0
+  left 0
+  right 0
+  display flex
+  gap 20rpx
+  padding 20rpx 30rpx
+  background-color #fff
+  border-top 1px solid #e5e5e5
+  box-shadow 0 -2rpx 8rpx rgba(0,0,0,0.05)
+
+.btn-primary, .btn-secondary
+  flex 1
+  height 80rpx
+  line-height 80rpx
+  border-radius 8rpx
+  font-size 28rpx
+  text-align center
+  border none
+
+.btn-primary
+  background-color #1890ff
+  color #fff
+  &:active
+    background-color #096dd9
+
+.btn-secondary
+  background-color #fff
+  color #666
+  border 1px solid #d9d9d9
+  &:active
+    background-color #fafafa
+  &:disabled
+    opacity 0.5
+
+.auto-refresh-bar
+  background-color #fff
+  padding 20rpx 30rpx
+  display flex
+  align-items center
+  margin-top 20rpx
+  border-top 1px solid #f0f0f0
+
+.refresh-label
+  font-size 28rpx
+  color #333
+  margin-right 20rpx
+
+.refresh-interval
+  display flex
+  align-items center
+  margin-left 30rpx
+
+.interval-label
+  font-size 24rpx
+  color #999
+  margin-right 10rpx
+
+.interval-value
+  font-size 26rpx
+  color #1890ff
+  text-decoration underline
+</style>

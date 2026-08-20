@@ -90,6 +90,10 @@
         <text class="tip" wx:elif="{{!canInstall}}">当前账号没有设备安装权限，仅可蓝牙调试</text>
         <text class="tip" wx:elif="{{!canDebug}}">当前账号没有蓝牙调试权限，仅可编辑安装信息</text>
         <view class="action-row">
+          <button class="bar-btn btn-monitor" bindtap="goMonitor">实时监控</button>
+          <button class="bar-btn btn-control" bindtap="goControl">远程控制</button>
+        </view>
+        <view class="action-row" style="margin-top: 16rpx;">
           <button
             class="bar-btn btn-debug {{canDebug ? '' : 'off'}}"
             disabled="{{!canDebug}}"
@@ -243,6 +247,21 @@ createPage({
     // 带上当前设备编号：从详情页进调试，准备页自动回填，现场不用再扫一次
     wx.navigateTo({ url: `/pages/ble/prepare?sn=${encodeURIComponent(this.data.sn)}` })
   },
+
+  /** 跳转到实时监控页 */
+  goMonitor() {
+    wx.navigateTo({ url: `/pages/monitor/index?sn=${encodeURIComponent(this.data.sn)}` })
+  },
+
+  /** 跳转到远程控制页 */
+  goControl() {
+    const deviceId = this.data.device.id
+    if (!deviceId) {
+      wx.showToast({ title: '设备信息不完整', icon: 'none' })
+      return
+    }
+    wx.navigateTo({ url: `/pages/control/index?deviceId=${deviceId}&sn=${encodeURIComponent(this.data.sn)}` })
+  },
 })
 </script>
 
@@ -389,6 +408,16 @@ createPage({
 }
 .bar-btn::after { border: none; }
 .bar-btn:active { transform: scale(0.97); }
+.btn-monitor {
+  color: #fff;
+  background: linear-gradient(135deg, #34C759 0%, #30D158 60%, #28A745 100%);
+  box-shadow: 0 12rpx 28rpx rgba(52, 199, 89, 0.32);
+}
+.btn-control {
+  color: #fff;
+  background: linear-gradient(135deg, #FF9500 0%, #FF9F0A 60%, #FF8800 100%);
+  box-shadow: 0 12rpx 28rpx rgba(255, 149, 0, 0.32);
+}
 .btn-debug {
   color: var(--color-primary); background: var(--color-fill);
   border: none;
@@ -414,6 +443,8 @@ createPage({
 .page.dark .sk-card { background: var(--color-card); }
 .page.dark .sk-hero-card { background: rgba(10, 132, 255, 0.10); }
 .page.dark .action-bar { background: var(--color-card); box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.5); }
+.page.dark .btn-monitor { background: linear-gradient(135deg, #32D74B, #30D158); box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.5); }
+.page.dark .btn-control { background: linear-gradient(135deg, #FF9F0A, #FF9500); box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.5); }
 .page.dark .btn-debug { background: var(--color-fill); }
 .page.dark .locate-btn { background: rgba(10, 132, 255, 0.16); }
 .page.dark .btn-edit { background: linear-gradient(135deg, #1A7AFF, #0A84FF); box-shadow: 0 12rpx 28rpx rgba(0, 0, 0, 0.5); }
