@@ -12,22 +12,6 @@
     <view class="control-section">
       <view class="section-title">快捷控制</view>
 
-      <!-- 开度调节 -->
-      <view class="control-card">
-        <view class="card-header">
-          <text class="card-title">开度调节</text>
-          <text class="card-hint">当前: {{ currentOpenness }}%</text>
-        </view>
-        <view class="card-body">
-          <slider value="{{ targetOpenness }}" min="0" max="100" show-value bindchange="handleOpennessChange" />
-          <view class="slider-value">目标: {{ targetOpenness }}%</view>
-        </view>
-        <view class="card-actions">
-          <button class="btn-small btn-cancel" bindtap="resetOpenness">重置</button>
-          <button class="btn-small btn-confirm" bindtap="handleSetOpenness">确认调节</button>
-        </view>
-      </view>
-
       <!-- 压力设定 -->
       <view class="control-card">
         <view class="card-header">
@@ -116,11 +100,9 @@ createPage({
     deviceId: null,
     deviceName: '',
     // 当前值（从实时数据获取）
-    currentOpenness: '-',
     currentPressure: '-',
     currentTemperature: '-',
     // 目标值（用户输入）
-    targetOpenness: 50,
     targetPressure: '',
     targetTemperature: '',
     // 操作历史
@@ -154,10 +136,8 @@ createPage({
         const data = await getDeviceRealtime(this.data.deviceSn)
         if (data && data.data) {
           this.setData({
-            currentOpenness: data.data.openness != null ? data.data.openness : '-',
             currentPressure: data.data.pressure != null ? data.data.pressure.toFixed(1) : '-',
-            currentTemperature: data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-',
-            targetOpenness: data.data.openness != null ? data.data.openness : this.data.targetOpenness
+            currentTemperature: data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-'
           })
         }
       } catch (e) {
@@ -178,11 +158,6 @@ createPage({
       }
     },
 
-    // 开度滑块变化
-    handleOpennessChange(e) {
-      this.setData({ targetOpenness: e.detail.value })
-    },
-
     // 压力输入
     handlePressureInput(e) {
       this.setData({ targetPressure: e.detail.value })
@@ -193,13 +168,6 @@ createPage({
       this.setData({ targetTemperature: e.detail.value })
     },
 
-    // 重置开度
-    resetOpenness() {
-      if (this.data.currentOpenness !== '-') {
-        this.setData({ targetOpenness: this.data.currentOpenness })
-      }
-    },
-
     // 重置压力
     resetPressure() {
       this.setData({ targetPressure: '' })
@@ -208,17 +176,6 @@ createPage({
     // 重置温度
     resetTemperature() {
       this.setData({ targetTemperature: '' })
-    },
-
-    // 设置开度
-    async handleSetOpenness() {
-      const openness = parseInt(this.data.targetOpenness)
-
-      // 二次确认
-      const confirm = await this.showConfirm(`确定将开度调节至 ${openness}% 吗？`)
-      if (!confirm) return
-
-      await this.sendCommand('set_openness', { openness })
     },
 
     // 设置压力
@@ -307,7 +264,6 @@ createPage({
     // 格式化命令名称
     formatCommand(command) {
       const commandMap = {
-        'set_openness': '开度调节',
         'set_pressure': '压力设定',
         'set_temperature': '温度设定'
       }
@@ -319,7 +275,6 @@ createPage({
       if (!paramsJson) return ''
       try {
         const params = JSON.parse(paramsJson)
-        if (params.openness != null) return `${params.openness}%`
         if (params.pressure != null) return `${params.pressure} MPa`
         if (params.temperature != null) return `${params.temperature}°C`
         return JSON.stringify(params)
