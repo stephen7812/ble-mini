@@ -112,7 +112,22 @@
     </view>
 
     <!-- 功能网格：后续新功能往这里加卡片 -->
-    <view class="grid">
+    <view class="grid" wx:if="{{isLogged}}">
+      <view class="card func-card anim-item d5" bindtap="goMonitor">
+        <view class="func-icon monitor-icon">
+          <view class="signal-bars">
+            <view class="bar b1"></view>
+            <view class="bar b2"></view>
+            <view class="bar b3"></view>
+            <view class="bar b4"></view>
+          </view>
+        </view>
+        <view class="func-text">
+          <text class="func-title">设备监控</text>
+          <text class="func-desc">实时查看设备运行状态与数据</text>
+        </view>
+        <text class="func-arrow">›</text>
+      </view>
     </view>
   </view>
 </template>
@@ -411,6 +426,16 @@ createPage({
     this.setData({ searchValue: '', searchResults: [], searching: false })
     wx.navigateTo({ url: `/pages/device/detail?sn=${encodeURIComponent(sn)}` })
   },
+
+  /** 跳转到设备监控：先让用户搜索选择设备 */
+  goMonitor() {
+    wx.showModal({
+      title: '设备监控',
+      content: '请先通过扫码或搜索找到要监控的设备，然后在设备详情页进入监控功能。',
+      showCancel: false,
+      confirmText: '知道了',
+    })
+  },
 })
 </script>
 
@@ -555,6 +580,9 @@ createPage({
 
 /* ========== 功能网格 ========== */
 .grid { margin-top: 24rpx; }
+.func-card { padding: 32rpx 28rpx; border-radius: 28rpx; box-shadow: var(--shadow-card); }
+.func-card:active { background: var(--color-fill); }
+.func-card { display: flex; align-items: center; position: relative; }
 .func { display: flex; align-items: center; padding: 32rpx 28rpx; position: relative; }
 .func:active { background: var(--color-fill); }
 .func.disabled .func-title, .func.disabled .func-desc { opacity: 0.45; }
@@ -562,6 +590,21 @@ createPage({
   position: relative; width: 80rpx; height: 80rpx; border-radius: 22rpx; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: rgba(0, 122, 255, 0.10);
+}
+.monitor-icon { background: rgba(52, 199, 89, 0.10); }
+.signal-bars { display: flex; align-items: flex-end; gap: 6rpx; }
+.bar {
+  width: 8rpx; border-radius: 4rpx 4rpx 0 0;
+  background: #34C759;
+  animation: barPulse 1.6s ease-in-out infinite;
+}
+.bar.b1 { height: 16rpx; }
+.bar.b2 { height: 28rpx; animation-delay: 0.2s; }
+.bar.b3 { height: 40rpx; animation-delay: 0.4s; }
+.bar.b4 { height: 52rpx; animation-delay: 0.6s; }
+@keyframes barPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 .ble-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: var(--color-primary); }
 .ble-wave { position: absolute; border: 3rpx solid var(--color-primary); border-radius: 50%; opacity: 0.5; }
@@ -578,6 +621,7 @@ createPage({
 .page.dark .account { box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.5); }
 .page.dark .role-tag { background: rgba(10, 132, 255, 0.16); }
 .page.dark .func-icon { background: rgba(10, 132, 255, 0.16); }
+.page.dark .monitor-icon { background: rgba(52, 199, 89, 0.16); }
 .page.dark .scan-disc { box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.55), inset 0 2rpx 0 rgba(255, 255, 255, 0.25); }
 .page.dark .scan-ring { border-color: rgba(10, 132, 255, 0.5); }
 .page.dark .theme-btn { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.24); }
