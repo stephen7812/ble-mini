@@ -196,9 +196,8 @@ createPage({
       const confirm = await this.showConfirm(`确定将目标压力设定为 ${pressure.toFixed(2)} MPa 吗？`)
       if (!confirm) return
 
-      // 注意：这里需要确认后端接受的单位是 MPa 还是 kPa
-      // 如果后端要 kPa，需要乘以 1000
-      await this.sendCommand('set_pressure', { pressure })
+      // 后端接口使用 kPa 单位，需要转换：MPa × 1000 = kPa
+      await this.sendCommand('set_pressure', { pressure: pressure * 1000 })
     },
 
     // 设置温度
@@ -275,7 +274,8 @@ createPage({
       if (!paramsJson) return ''
       try {
         const params = JSON.parse(paramsJson)
-        if (params.pressure != null) return `${params.pressure} MPa`
+        // 后端存储的是 kPa，显示时转换为 MPa
+        if (params.pressure != null) return `${(params.pressure / 1000).toFixed(2)} MPa`
         if (params.temperature != null) return `${params.temperature}°C`
         return JSON.stringify(params)
       } catch (e) {
