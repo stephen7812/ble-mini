@@ -1,0 +1,378 @@
+<template>
+  <view class="history-page">
+    <!-- 页面头部 -->
+    <view class="page-header">
+      <view class="header-info">
+        <text class="device-name">{{ deviceName }}</text>
+        <text class="device-sn">SN: {{ deviceSn }}</text>
+      </view>
+      <button class="btn-clear" bindtap="handleClearAll" wx:if="{{ taskList.length > 0 }}">
+        清空记录
+      </button>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="loading-section" wx:if="{{ loading }}">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">加载中...</text>
+    </view>
+
+    <!-- 历史记录列表 -->
+    <view class="history-list" wx:if="{{ !loading && taskList.length > 0 }}">
+      <view class="task-item" wx:for="{{ taskList }}" wx:key="id">
+        <view class="task-header">
+          <text class="task-command">{{ item.command }}</text>
+          <view class="task-status {{ getStatusClass(item.status) }}">
+            {{ getStatusText(item.status) }}
+          </view>
+        </view>
+        <view class="task-params">{{ formatParams(item.params) }}</view>
+        <view class="task-meta">
+          <text class="task-meta-item">操作人：{{ item.operator_name || '未知' }}</text>
+          <text class="task-meta-item">来源：{{ getSourceText(item.source) }}</text>
+        </view>
+        <view class="task-footer">
+          <text class="task-time">{{ formatTime(item.executed_at || item.created_at) }}</text>
+        </view>
+        <view class="task-result" wx:if="{{ item.result }}">
+          <text class="result-label">执行结果：</text>
+          <text class="result-text">{{ item.result }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-section" wx:if="{{ !loading && taskList.length === 0 }}">
+      <text class="empty-icon">📝</text>
+      <text class="empty-title">暂无操作记录</text>
+      <text class="empty-hint">执行控制指令后会在此显示</text>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { getControlTaskList, clearControlTaskHistory } from '../../services/api/tenant'
+
+createPage({
+  data: {
+    deviceSn: '',
+    deviceId: null,
+    deviceName: '',
+    taskList: [],
+    loading: true
+  },
+
+  onLoad(options) {
+    const { sn, deviceId, name } = options
+    if (!sn || !deviceId) {
+      wx.showToast({ title: '缺少设备参数', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 1500)
+      return
+    }
+
+    this.setData({
+      deviceSn: sn,
+      deviceId: parseInt(deviceId),
+      deviceName: name || sn
+    })
+
+    this.loadTaskHistory()
+  },
+
+  onShow() {
+    // 每次显示页面时刷新数据
+    if (this.data.deviceSn) {
+      this.loadTaskHistory()
+    }
+  },
+
+  methods: {
+    // 加载操作历史
+    async loadTaskHistory() {
+      this.setData({ loading: true })
+      try {
+        // 小程序端标记 client_type 为 miniapp，只返回当前用户的日志
+        const result = await getControlTaskList(1, 50)
+        // 只显示当前设备的任务
+        const filteredList = (result.list || []).filter(task =>
+          task.device_sn === this.data.deviceSn || task.device_id === this.data.deviceId
+        )
+        this.setData({
+          taskList: filteredList,
+          loading: false
+        })
+      } catch (e) {
+        console.error('加载操作历史失败:', e)
+        this.setData({ loading: false })
+        wx.showToast({ title: '加载失败', icon: 'none' })
+      }
+    },
+
+    // 清空所有记录
+    handleClearAll() {
+      wx.showModal({
+        title: '确认清空',
+        content: '确定要清空所有操作记录吗？',
+        confirmText: '清空',
+        confirmColor: '#ff4d4f',
+        success: (res) => {
+          if (res.confirm) {
+            this.clearAllRecords()
+          }
+        }
+      })
+    },
+
+    // 执行清空操作
+    async clearAllRecords() {
+      wx.showLoading({ title: '清空中...', mask: true })
+      try {
+        await clearControlTaskHistory(this.data.deviceId, this.data.deviceSn)
+        this.setData({ taskList: [] })
+        wx.hideLoading()
+        wx.showToast({ title: '已清空', icon: 'success' })
+      } catch (e) {
+        wx.hideLoading()
+        wx.showToast({ title: e.message || '清空失败', icon: 'none' })
+      }
+    },
+
+    // 格式化参数
+    formatParams(paramsJson) {
+      if (!paramsJson) return '无参数'
+      try {
+        const params = typeof paramsJson === 'string' ? JSON.parse(paramsJson) : paramsJson
+        return Object.entries(params).map(([k, v]) => `${k}: ${v}`).join(', ')
+      } catch (e) {
+        return String(paramsJson)
+      }
+    },
+
+    // 格式化时间
+    formatTime(timestamp) {
+      if (!timestamp) return ''
+      const date = new Date(timestamp * 1000)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      const second = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+    },
+
+    // 获取状态样式类
+    getStatusClass(status) {
+      if (status === 1) return 'status-success'
+      if (status === 3 || status === 4) return 'status-fail'
+      return 'status-pending'
+    },
+
+    // 获取状态文本
+    getStatusText(status) {
+      const statusMap = {
+        0: '待执行',
+        1: '成功',
+        2: '执行中',
+        3: '失败',
+        4: '已取消'
+      }
+      return statusMap[status] || '未知'
+    },
+
+    // 获取操作来源文本
+    getSourceText(source) {
+      const sourceMap = {
+        'miniapp': '小程序',
+        'web': 'PC端',
+        'api': 'API',
+        'unknown': '未知'
+      }
+      return sourceMap[source] || '未知'
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.history-page
+  min-height 100vh
+  background-color #f5f5f5
+
+.page-header
+  background-color #fff
+  padding 30rpx
+  border-bottom 1px solid #e5e5e5
+  display flex
+  justify-content space-between
+  align-items center
+
+.header-info
+  flex 1
+
+.device-name
+  font-size 36rpx
+  font-weight bold
+  color #333
+  display block
+  margin-bottom 8rpx
+
+.device-sn
+  font-size 24rpx
+  color #999
+
+.btn-clear
+  padding 16rpx 32rpx
+  font-size 26rpx
+  background-color #ff4d4f
+  color #fff
+  border-radius 8rpx
+  border none
+
+.btn-clear::after
+  border none
+
+/* 加载状态 */
+.loading-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.loading-spinner
+  width 60rpx
+  height 60rpx
+  border 6rpx solid #f3f3f3
+  border-top 6rpx solid #1890ff
+  border-radius 50%
+  animation spinAnim 0.8s linear infinite
+  margin-bottom 24rpx
+
+.loading-text
+  font-size 28rpx
+  color #999
+
+/* 历史记录列表 */
+.history-list
+  padding 20rpx
+
+.task-item
+  background-color #fff
+  padding 30rpx
+  margin-bottom 20rpx
+  border-radius 16rpx
+  box-shadow 0 2rpx 8rpx rgba(0, 0, 0, 0.06)
+
+.task-header
+  display flex
+  justify-content space-between
+  align-items center
+  margin-bottom 16rpx
+
+.task-command
+  font-size 32rpx
+  font-weight 600
+  color #333
+  flex 1
+
+.task-status
+  padding 8rpx 20rpx
+  border-radius 8rpx
+  font-size 24rpx
+  font-weight 500
+
+.status-success
+  background-color #f6ffed
+  color #52c41a
+  border 1px solid #b7eb8f
+
+.status-fail
+  background-color #fff2f0
+  color #ff4d4f
+  border 1px solid #ffccc7
+
+.status-pending
+  background-color #e6f7ff
+  color #1890ff
+  border 1px solid #91d5ff
+
+.task-params
+  font-size 26rpx
+  color #666
+  line-height 1.6
+  margin-bottom 16rpx
+  word-break break-all
+
+.task-meta
+  display flex
+  gap 20rpx
+  margin-bottom 16rpx
+  flex-wrap wrap
+
+.task-meta-item
+  font-size 24rpx
+  color #999
+  padding 4rpx 12rpx
+  background-color #f5f5f5
+  border-radius 4rpx
+
+.task-footer
+  display flex
+  justify-content space-between
+  align-items center
+
+.task-time
+  font-size 24rpx
+  color #999
+
+.task-result
+  margin-top 16rpx
+  padding-top 16rpx
+  border-top 1rpx solid #f0f0f0
+
+.result-label
+  font-size 24rpx
+  color #999
+  margin-right 8rpx
+
+.result-text
+  font-size 24rpx
+  color #666
+  word-break break-all
+
+/* 空状态 */
+.empty-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.empty-icon
+  font-size 80rpx
+  margin-bottom 24rpx
+
+.empty-title
+  font-size 32rpx
+  font-weight 600
+  color #666
+  margin-bottom 16rpx
+
+.empty-hint
+  font-size 26rpx
+  color #999
+  text-align center
+  line-height 1.5
+</style>
+
+<style>
+/* 动画定义 */
+@keyframes spinAnim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
+
+<script type="application/json">
+{ "navigationBarTitleText": "操作历史" }
+</script>

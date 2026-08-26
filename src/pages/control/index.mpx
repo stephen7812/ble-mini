@@ -6,84 +6,62 @@
         <text class="device-name">{{ deviceName }}</text>
         <text class="device-sn">SN: {{ deviceSn }}</text>
       </view>
-    </view>
-
-    <!-- 快捷控制卡片 -->
-    <view class="control-section">
-      <view class="section-title">快捷控制</view>
-
-      <!-- 压力设定 -->
-      <view class="control-card">
-        <view class="card-header">
-          <text class="card-title">压力设定</text>
-          <text class="card-hint">当前: {{ currentPressure }} MPa</text>
-        </view>
-        <view class="card-body">
-          <view class="input-row">
-            <text class="input-label">目标压力</text>
-            <input
-              class="input-field"
-              type="digit"
-              value="{{ targetPressure }}"
-              placeholder="请输入压力值"
-              bindinput="handlePressureInput"
-            />
-            <text class="input-unit">MPa</text>
-          </view>
-          <text class="input-hint">范围: 0.0 ~ 1.6 MPa</text>
-        </view>
-        <view class="card-actions">
-          <button class="btn-small btn-cancel" bindtap="resetPressure">重置</button>
-          <button class="btn-small btn-confirm" bindtap="handleSetPressure">确认设定</button>
-        </view>
-      </view>
-
-      <!-- 温度设定 -->
-      <view class="control-card">
-        <view class="card-header">
-          <text class="card-title">温度设定</text>
-          <text class="card-hint">当前: {{ currentTemperature }}°C</text>
-        </view>
-        <view class="card-body">
-          <view class="input-row">
-            <text class="input-label">目标温度</text>
-            <input
-              class="input-field"
-              type="digit"
-              value="{{ targetTemperature }}"
-              placeholder="请输入温度值"
-              bindinput="handleTemperatureInput"
-            />
-            <text class="input-unit">°C</text>
-          </view>
-          <text class="input-hint">范围: 5 ~ 95°C</text>
-        </view>
-        <view class="card-actions">
-          <button class="btn-small btn-cancel" bindtap="resetTemperature">重置</button>
-          <button class="btn-small btn-confirm" bindtap="handleSetTemperature">确认设定</button>
-        </view>
+      <!-- 历史记录图标 -->
+      <view class="history-icon" bindtap="goHistory">
+        <text class="icon-text">📋</text>
       </view>
     </view>
 
-    <!-- 历史操作记录 -->
-    <view class="history-section" wx:if="{{ taskList.length > 0 }}">
-      <view class="section-title">历史操作</view>
-      <view class="task-list">
-        <view class="task-item" wx:for="{{ taskList }}" wx:key="id">
-          <view class="task-info">
-            <text class="task-command">{{ formatCommand(item.command) }}</text>
-            <text class="task-params">{{ formatParams(item.params) }}</text>
-            <text class="task-time">{{ formatTime(item.executed_at || item.created_at) }}</text>
+    <!-- 加载状态 -->
+    <view class="loading-section" wx:if="{{ loadingCommands }}">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">正在加载控制功能...</text>
+    </view>
+
+    <!-- 暂无可用控制功能 -->
+    <view class="empty-section" wx:if="{{ !loadingCommands && availableCommands.length === 0 }}">
+      <text class="empty-icon">⚠️</text>
+      <text class="empty-title">暂无可用控制功能</text>
+      <text class="empty-hint">该设备暂不支持远程控制，或网络连接异常</text>
+    </view>
+
+    <!-- 动态控制卡片 -->
+    <view class="control-section" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
+      <view class="section-title">远程控制</view>
+
+      <!-- 动态渲染每个命令 -->
+      <view class="control-card" wx:for="{{ availableCommands }}" wx:key="command">
+        <view class="card-header">
+          <text class="card-title">{{ item.name }}</text>
+          <text class="card-desc" wx:if="{{ item.description }}">{{ item.description }}</text>
+        </view>
+
+        <view class="card-body">
+          <!-- 动态渲染参数输入 -->
+          <view class="input-row" wx:for="{{ item.params }}" wx:for-item="param" wx:key="key">
+            <text class="input-label">{{ param.label }}</text>
+            <input
+              class="input-field"
+              type="{{ param.type === 'number' ? 'digit' : 'text' }}"
+              data-command="{{ item.command }}"
+              data-param="{{ param.key }}"
+              value="{{ getParamValue(item.command, param.key) }}"
+              placeholder="{{ param.default }}"
+              bindinput="handleParamInput"
+            />
           </view>
-          <view class="task-status" :class="getStatusClass(item.status)">
-            {{ getStatusText(item.status) }}
-          </view>
+        </view>
+
+        <view class="card-actions">
+          <button class="btn-confirm" data-command="{{ item.command }}" bindtap="handleSendCommand">
+            确认执行
+          </button>
         </view>
       </view>
     </view>
 
     <!-- 底部安全提示 -->
-    <view class="safety-notice">
+    <view class="safety-notice" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
       <text class="notice-icon">⚠️</text>
       <text class="notice-text">远程控制将直接作用于设备，请谨慎操作</text>
     </view>
@@ -92,21 +70,22 @@
 
 <script>
 import { createPage } from '@mpxjs/core'
-import { sendControlCommand, getControlTaskList, getDeviceRealtime } from '../../services/api/tenant'
+import { sendControlCommand, getDeviceCommands, getDeviceBySn } from '../../services/api/tenant'
 
 createPage({
   data: {
     deviceSn: '',
     deviceId: null,
     deviceName: '',
-    // 当前值（从实时数据获取）
-    currentPressure: '-',
-    currentTemperature: '-',
-    // 目标值（用户输入）
-    targetPressure: '',
-    targetTemperature: '',
-    // 操作历史
-    taskList: []
+    valveType: '', // 阀门类型：pilot=先导阀，flow=流量阀等
+    // 平台信息
+    platformName: '',
+    platformKind: '',
+    // 设备支持的指令列表
+    availableCommands: [],
+    loadingCommands: true,
+    // 参数值存储 { command: { paramKey: value } }
+    paramValues: {}
   },
 
   onLoad(options) {
@@ -123,119 +102,190 @@ createPage({
       deviceName: name || sn
     })
 
-    // 加载设备当前状态
-    this.loadDeviceStatus()
-    // 加载操作历史
-    this.loadTaskHistory()
+    // 先获取设备完整信息，再查询支持的指令
+    this.loadDeviceInfo()
   },
 
   methods: {
-    // 加载设备当前状态
-    async loadDeviceStatus() {
+    // 加载设备完整信息（包含平台、产品等信息）
+    async loadDeviceInfo() {
       try {
-        const data = await getDeviceRealtime(this.data.deviceSn)
-        if (data && data.data) {
-          this.setData({
-            currentPressure: data.data.pressure != null ? data.data.pressure.toFixed(1) : '-',
-            currentTemperature: data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-'
-          })
-        }
-      } catch (e) {
-        console.error('加载设备状态失败:', e)
-      }
-    },
+        const device = await getDeviceBySn(this.data.deviceSn)
 
-    // 加载操作历史
-    async loadTaskHistory() {
-      try {
-        const result = await getControlTaskList(1, 10)
-        // 只显示当前设备的任务
+        // 保存设备信息，用于后续判断平台类型
+        this.deviceInfo = device
+
+        // 更新设备名称和阀门类型
+        // 注意：如果 valve_type 为 null/undefined，需要从其他字段推断或默认处理
+        const valveType = device.valve_type || ''
+
         this.setData({
-          taskList: (result.list || []).filter(task => task.device_sn === this.data.deviceSn)
+          deviceName: device.name || this.data.deviceSn,
+          valveType: valveType
         })
+
+        console.log('设备信息:', {
+          name: device.name,
+          valve_type: device.valve_type,
+          valveType: valveType,
+          sn: device.sn,
+          device_model: device.device_model
+        })
+
+        // 获取设备支持的指令列表
+        this.loadAvailableCommands()
+
       } catch (e) {
-        console.error('加载操作历史失败:', e)
+        console.error('加载设备信息失败:', e)
+        wx.showModal({
+          title: '加载失败',
+          content: '无法获取设备信息，请检查网络后重试',
+          confirmText: '重试',
+          cancelText: '返回',
+          success: (res) => {
+            if (res.confirm) {
+              this.loadDeviceInfo()
+            } else {
+              wx.navigateBack()
+            }
+          }
+        })
       }
     },
 
-    // 压力输入
-    handlePressureInput(e) {
-      this.setData({ targetPressure: e.detail.value })
+    // 加载设备支持的指令列表
+    async loadAvailableCommands() {
+      this.setData({ loadingCommands: true })
+      try {
+        const result = await getDeviceCommands(this.data.deviceSn)
+
+        console.log('API返回数据:', result)
+
+        // 解析返回的数据结构
+        // { kind: "black-ant", platform: "black-ant", capability: { commands: [...] } }
+        const platformKind = result.kind || result.platform || ''
+        const platformName = platformKind === 'black-ant' ? '黑蚂蚁' : (platformKind === 'huawei-iotda' ? '华为IoTDA' : platformKind)
+        let commands = result.capability && result.capability.commands ? result.capability.commands : []
+
+        console.log('过滤前的指令列表:', commands)
+        console.log('当前阀门类型:', this.data.valveType)
+
+        // 根据阀门类型过滤命令：先导阀不能设置开度和圈数
+        if (this.data.valveType === 'pilot') {
+          const originalLength = commands.length
+          commands = commands.filter(cmd => {
+            const command = cmd.command.toLowerCase()
+            const shouldKeep = !command.includes('open') && !command.includes('position')
+            console.log(`命令 ${cmd.command}: ${shouldKeep ? '保留' : '过滤'}`)
+            return shouldKeep
+          })
+          console.log(`先导阀过滤: ${originalLength} -> ${commands.length} 条命令`)
+        }
+
+        console.log('过滤后的指令列表:', commands)
+
+        // 初始化参数默认值
+        const paramValues = {}
+        commands.forEach(cmd => {
+          paramValues[cmd.command] = {}
+          if (cmd.params && Array.isArray(cmd.params)) {
+            cmd.params.forEach(param => {
+              paramValues[cmd.command][param.key] = param.default || ''
+            })
+          }
+        })
+
+        this.setData({
+          availableCommands: commands,
+          platformName: platformName,
+          platformKind: platformKind,
+          paramValues: paramValues,
+          loadingCommands: false
+        })
+
+      } catch (e) {
+        console.error('加载设备支持指令失败:', e)
+        this.setData({
+          availableCommands: [],
+          loadingCommands: false
+        })
+
+        wx.showModal({
+          title: '加载失败',
+          content: e.message || '无法获取设备控制功能',
+          showCancel: false
+        })
+      }
     },
 
-    // 温度输入
-    handleTemperatureInput(e) {
-      this.setData({ targetTemperature: e.detail.value })
+    // 获取参数值
+    getParamValue(command, paramKey) {
+      if (!this.data.paramValues || !this.data.paramValues[command]) {
+        return ''
+      }
+      return this.data.paramValues[command][paramKey] || ''
     },
 
-    // 重置压力
-    resetPressure() {
-      this.setData({ targetPressure: '' })
+    // 参数输入
+    handleParamInput(e) {
+      const { command, param } = e.currentTarget.dataset
+      const value = e.detail.value
+
+      this.setData({
+        [`paramValues.${command}.${param}`]: value
+      })
     },
 
-    // 重置温度
-    resetTemperature() {
-      this.setData({ targetTemperature: '' })
-    },
+    // 发送控制指令
+    async handleSendCommand(e) {
+      const commandName = e.currentTarget.dataset.command
 
-    // 设置压力
-    async handleSetPressure() {
-      const pressure = parseFloat(this.data.targetPressure)
-
-      // 参数校验
-      if (isNaN(pressure)) {
-        wx.showToast({ title: '请输入有效的压力值', icon: 'none' })
+      // 找到对应的命令配置
+      const commandConfig = this.data.availableCommands.find(cmd => cmd.command === commandName)
+      if (!commandConfig) {
+        wx.showToast({ title: '指令配置错误', icon: 'none' })
         return
       }
-      if (pressure < 0 || pressure > 1.6) {
-        wx.showToast({ title: '压力值范围: 0.0 ~ 1.6 MPa', icon: 'none' })
-        return
+
+      // 获取参数值
+      const params = {}
+      const commandValues = this.data.paramValues[commandName] || {}
+
+      if (commandConfig.params && Array.isArray(commandConfig.params)) {
+        for (const paramDef of commandConfig.params) {
+          const value = commandValues[paramDef.key]
+
+          // 参数验证
+          if (value === '' || value === undefined) {
+            wx.showToast({ title: `请输入${paramDef.label}`, icon: 'none' })
+            return
+          }
+
+          // 类型转换
+          if (paramDef.type === 'number') {
+            params[paramDef.key] = Number(value)
+            if (isNaN(params[paramDef.key])) {
+              wx.showToast({ title: `${paramDef.label}必须是数字`, icon: 'none' })
+              return
+            }
+          } else {
+            params[paramDef.key] = value
+          }
+        }
       }
 
       // 二次确认
-      const confirm = await this.showConfirm(`确定将目标压力设定为 ${pressure.toFixed(2)} MPa 吗？`)
+      const confirm = await this.showConfirm(`确定执行【${commandConfig.name}】吗？`)
       if (!confirm) return
 
-      // 后端接口使用 kPa 单位，需要转换：MPa × 1000 = kPa
-      await this.sendCommand('set_pressure', { pressure: pressure * 1000 })
-    },
-
-    // 设置温度
-    async handleSetTemperature() {
-      const temperature = parseFloat(this.data.targetTemperature)
-
-      // 参数校验
-      if (isNaN(temperature)) {
-        wx.showToast({ title: '请输入有效的温度值', icon: 'none' })
-        return
-      }
-      if (temperature < 5 || temperature > 95) {
-        wx.showToast({ title: '温度值范围: 5 ~ 95°C', icon: 'none' })
-        return
-      }
-
-      // 二次确认
-      const confirm = await this.showConfirm(`确定将目标温度设定为 ${temperature.toFixed(1)}°C 吗？`)
-      if (!confirm) return
-
-      await this.sendCommand('set_temperature', { temperature })
-    },
-
-    // 发送控制指令（统一处理）
-    async sendCommand(command, params) {
+      // 发送指令
       wx.showLoading({ title: '指令下发中...', mask: true })
 
       try {
-        await sendControlCommand(this.data.deviceId, command, params)
+        await sendControlCommand(this.data.deviceId, commandName, params)
 
         wx.hideLoading()
         wx.showToast({ title: '指令下发成功', icon: 'success' })
-
-        // 刷新操作历史
-        setTimeout(() => this.loadTaskHistory(), 500)
-
-        // 延迟刷新设备数据（等待设备执行）
-        setTimeout(() => this.loadDeviceStatus(), 3000)
 
       } catch (e) {
         wx.hideLoading()
@@ -245,6 +295,13 @@ createPage({
           showCancel: false
         })
       }
+    },
+
+    // 跳转到历史记录页面
+    goHistory() {
+      wx.navigateTo({
+        url: `/pages/control-history/index?deviceId=${this.data.deviceId}&sn=${encodeURIComponent(this.data.deviceSn)}&name=${encodeURIComponent(this.data.deviceName)}`
+      })
     },
 
     // 显示确认对话框
@@ -258,54 +315,6 @@ createPage({
           }
         })
       })
-    },
-
-    // 格式化命令名称
-    formatCommand(command) {
-      const commandMap = {
-        'set_pressure': '压力设定',
-        'set_temperature': '温度设定'
-      }
-      return commandMap[command] || command
-    },
-
-    // 格式化参数
-    formatParams(paramsJson) {
-      if (!paramsJson) return ''
-      try {
-        const params = JSON.parse(paramsJson)
-        // 后端存储的是 kPa，显示时转换为 MPa
-        if (params.pressure != null) return `${(params.pressure / 1000).toFixed(2)} MPa`
-        if (params.temperature != null) return `${params.temperature}°C`
-        return JSON.stringify(params)
-      } catch (e) {
-        return paramsJson
-      }
-    },
-
-    // 格式化时间
-    formatTime(timestamp) {
-      if (!timestamp) return ''
-      const date = new Date(timestamp * 1000)
-      return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
-    },
-
-    // 获取状态样式类
-    getStatusClass(status) {
-      if (status === 1) return 'status-success'
-      if (status === 3 || status === 4) return 'status-fail'
-      return 'status-pending'
-    },
-
-    // 获取状态文本
-    getStatusText(status) {
-      const statusMap = {
-        0: '待执行',
-        1: '成功',
-        3: '失败',
-        4: '已取消'
-      }
-      return statusMap[status] || '未知'
     }
   }
 })
@@ -321,20 +330,95 @@ createPage({
   background-color #fff
   padding 30rpx
   border-bottom 1px solid #e5e5e5
+  display flex
+  justify-content space-between
+  align-items flex-start
 
 .device-title
   display flex
-  align-items baseline
+  flex-direction column
+  align-items flex-start
+  flex 1
 
 .device-name
   font-size 36rpx
   font-weight bold
   color #333
-  margin-right 20rpx
+  margin-bottom 12rpx
 
 .device-sn
   font-size 24rpx
   color #999
+
+.history-icon
+  width 80rpx
+  height 80rpx
+  display flex
+  align-items center
+  justify-content center
+  background-color #f5f5f5
+  border-radius 50%
+  cursor pointer
+  transition all 0.3s
+
+.history-icon:active
+  background-color #e0e0e0
+  transform scale(0.95)
+
+.history-icon .icon-text
+  font-size 40rpx
+
+.platform-badge
+  display inline-block
+  padding 6rpx 16rpx
+  background-color #e6f7ff
+  color #1890ff
+  border-radius 4rpx
+  font-size 22rpx
+  border 1px solid #91d5ff
+
+/* 加载状态 */
+.loading-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.loading-spinner
+  width 60rpx
+  height 60rpx
+  border 6rpx solid #f3f3f3
+  border-top-color #1890ff
+  border-radius 50%
+  animation spinAnim 0.8s linear infinite
+  margin-bottom 24rpx
+
+.loading-text
+  font-size 28rpx
+  color #999
+
+/* 空状态 */
+.empty-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.empty-icon
+  font-size 80rpx
+  margin-bottom 24rpx
+
+.empty-title
+  font-size 32rpx
+  font-weight 600
+  color #666
+  margin-bottom 16rpx
+
+.empty-hint
+  font-size 26rpx
+  color #999
+  text-align center
+  line-height 1.5
 
 .control-section
   margin-top 20rpx
@@ -352,38 +436,32 @@ createPage({
   padding 30rpx
 
 .card-header
-  display flex
-  justify-content space-between
-  align-items center
-  margin-bottom 30rpx
+  margin-bottom 24rpx
 
 .card-title
   font-size 32rpx
   font-weight bold
   color #333
+  margin-bottom 8rpx
 
-.card-hint
+.card-desc
   font-size 24rpx
   color #999
+  line-height 1.4
 
 .card-body
-  margin-bottom 30rpx
-
-.slider-value
-  text-align center
-  font-size 28rpx
-  color #1890ff
-  margin-top 20rpx
+  margin-bottom 24rpx
 
 .input-row
   display flex
   align-items center
-  margin-bottom 15rpx
+  margin-bottom 20rpx
 
 .input-label
   font-size 28rpx
   color #666
-  width 150rpx
+  width 180rpx
+  flex-shrink 0
 
 .input-field
   flex 1
@@ -392,41 +470,22 @@ createPage({
   border 1px solid #d9d9d9
   border-radius 8rpx
   font-size 28rpx
-
-.input-unit
-  font-size 24rpx
-  color #999
-  margin-left 15rpx
-  width 80rpx
-
-.input-hint
-  font-size 24rpx
-  color #999
-  padding-left 150rpx
+  background-color #fafafa
 
 .card-actions
   display flex
-  gap 20rpx
-
-.btn-small
-  flex 1
-  height 70rpx
-  line-height 70rpx
-  border-radius 8rpx
-  font-size 28rpx
-  text-align center
-  border none
-
-.btn-cancel
-  background-color #fff
-  color #666
-  border 1px solid #d9d9d9
-  &:active
-    background-color #fafafa
 
 .btn-confirm
+  flex 1
+  height 80rpx
+  line-height 80rpx
+  border-radius 8rpx
+  font-size 30rpx
+  text-align center
+  border none
   background-color #1890ff
   color #fff
+  font-weight 600
   &:active
     background-color #096dd9
 
@@ -483,11 +542,10 @@ createPage({
   align-items center
   justify-content center
   padding 30rpx
-  margin-top 20rpx
+  margin 20rpx 30rpx
   background-color #fffbe6
   border 1px solid #ffe58f
   border-radius 8rpx
-  margin 20rpx 30rpx
 
 .notice-icon
   font-size 32rpx
@@ -497,3 +555,19 @@ createPage({
   font-size 24rpx
   color #d48806
 </style>
+
+<style>
+/* 旋转动画 - 使用纯CSS避免Stylus添加-moz-前缀 */
+@keyframes spinAnim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
+
+<script type="application/json">
+{
+  "navigationBarTitleText": "远程控制",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black"
+}
+</script>

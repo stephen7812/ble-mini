@@ -121,13 +121,14 @@ export function getDeviceCommands(deviceSn) {
  * @param {number} deviceId 设备 ID（注意不是 SN）
  * @param {string} command 命令名称（如 'set_openness'）
  * @param {Object} params 命令参数（如 { openness: 50 }）
+ * @param {string} source 操作来源（miniapp/web/api）
  * @returns {Promise<Object>} 任务 ID { id: 123 }
  */
-export function createControlTask(deviceId, command, params) {
+export function createControlTask(deviceId, command, params, source = 'miniapp') {
   return request({
     url: '/tenant/control/task/create',
     method: 'POST',
-    data: { device_id: deviceId, command, params }
+    data: { device_id: deviceId, command, params, source }
   })
 }
 
@@ -162,7 +163,8 @@ export function executeControlTask(taskId) {
  * await sendControlCommand(123, 'set_pressure', { pressure: 0.4 })
  */
 export async function sendControlCommand(deviceId, command, params) {
-  const { id } = await createControlTask(deviceId, command, params)
+  // 小程序端调用，标记操作来源为 miniapp
+  const { id } = await createControlTask(deviceId, command, params, 'miniapp')
   return executeControlTask(id)
 }
 
@@ -176,9 +178,25 @@ export async function sendControlCommand(deviceId, command, params) {
  */
 export function getControlTaskList(page = 1, pageSize = 20, status) {
   const statusParam = status !== undefined ? `&status=${status}` : ''
+  // 小程序端标记 client_type 为 miniapp
   return request({
-    url: `/tenant/control/task/list?page=${page}&page_size=${pageSize}${statusParam}`,
+    url: `/tenant/control/task/list?page=${page}&page_size=${pageSize}${statusParam}&client_type=miniapp`,
     method: 'GET'
+  })
+}
+
+/**
+ * 清空设备的控制任务历史记录。
+ *
+ * @param {number} deviceId 设备 ID
+ * @param {string} deviceSn 设备 SN
+ * @returns {Promise<Object>} 删除结果 { deleted: number }
+ */
+export function clearControlTaskHistory(deviceId, deviceSn) {
+  return request({
+    url: '/tenant/control/task/clear',
+    method: 'POST',
+    data: { device_id: deviceId, device_sn: deviceSn }
   })
 }
 

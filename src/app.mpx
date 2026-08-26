@@ -170,6 +170,7 @@ page {
     "./pages/scan/index",
     "./pages/monitor/index",
     "./pages/control/index",
+    "./pages/control-history/index",
     "./pages/device-info/index",
     "./pages/broadcast/index"
   ],

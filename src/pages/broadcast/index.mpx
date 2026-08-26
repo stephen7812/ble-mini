@@ -202,16 +202,6 @@
 
         <view class="pf-field">
           <view class="pf-row">
-            <text class="pf-label">阀门圈数</text>
-            <view class="pf-inp">
-              <input class="pf-input" type="digit" model:value="{{p_position}}" placeholder="0~255" />
-            </view>
-          </view>
-          <button class="pf-btn" bindtap="execCmd('syncValvePosition',null,[p_position])">同步</button>
-        </view>
-
-        <view class="pf-field">
-          <view class="pf-row">
             <text class="pf-label">压力补偿</text>
             <view class="pf-inp">
               <input class="pf-input" type="digit" model:value="{{p_compIn}}" placeholder="进水补偿" />
@@ -220,19 +210,6 @@
             </view>
           </view>
           <button class="pf-btn" bindtap="execCmd('setPressureCompensation',null,[p_compIn,p_compRet])">补偿</button>
-        </view>
-
-        <view class="pf-field pf-group">
-          <text class="pf-group-title">圈数限位</text>
-          <view class="pf-row">
-            <text class="pf-label">上限/下限</text>
-            <view class="pf-inp">
-              <input class="pf-input" type="digit" model:value="{{p_limitU}}" placeholder="上限" />
-              <text class="pf-unit">/</text>
-              <input class="pf-input" type="digit" model:value="{{p_limitL}}" placeholder="下限" />
-            </view>
-          </view>
-          <button class="pf-btn" bindtap="execCmd('setPositionLimits',null,[p_limitU,p_limitL])">设限</button>
         </view>
 
         <view class="pf-field pf-group">
@@ -510,7 +487,7 @@ function slotsToParams(enable, slots) {
 
 // 状态/功能位语义化：BLE 单字节只承载 V902ZF 状态字的低8位(BIT0~7)，高8位(电池欠压/SIM/4G/网络等)仅物联网上报
 // 设备状态位定义表：置位=故障(0正常/1故障)
-const VALVE_STATUS_BITS = ['阀门堵转', '阀门空转', '电位器故障', '霍尔传感器故障', '进水压力传感器故障', '出水压力传感器故障', '压差异常', '出水压力调节异常']
+const VALVE_STATUS_BITS = ['阀门堵转', '阀门空转', '电位器故障', '霍尔传感器故障', '阀前压力传感器故障', '出水压力传感器故障', '压差异常', '出水压力调节异常']
 // 功能模块使能位定义表：置位=使能(0禁止/1使能)
 const VALVE_FUNC_BITS = ['LCD显示', '拆除报警', '', '', '', '压力上限报警', '压力下限报警', '压力变化阈值报警']
 function bitsOn(hex, names) {
@@ -530,13 +507,13 @@ function valveFunc(v) {                                  // 列出已使能的�
 
 // 查询第一页 回复 0x3F（15 字节数据域）
 const PAGE1_LAYOUT_NEW = [
-  { key: 'inletPressure', label: '进水压力', start: 2, end: 4, parse: kpa10 },
-  { key: 'returnPressure', label: '回水压力', start: 4, end: 6, parse: kpa10 },
+  { key: 'inletPressure', label: '阀前压力', start: 2, end: 4, parse: kpa10 },
+  { key: 'returnPressure', label: '阀后压力', start: 4, end: 6, parse: kpa10 },
   { key: 'setPressure', label: '设定压力', start: 6, end: 8, parse: kpa10 },
-  { key: 'inletComp', label: '进水压力补偿', start: 8, end: 10, parse: kpaS8 },
-  { key: 'returnComp', label: '回水压力补偿', start: 10, end: 12, parse: kpaS8 },
-  { key: 'returnUpper', label: '回水压力上限', start: 12, end: 14, parse: kpa10 },
-  { key: 'returnLower', label: '回水压力下限', start: 14, end: 16, parse: kpa10 },
+  { key: 'inletComp', label: '阀前压力补偿', start: 8, end: 10, parse: kpaS8 },
+  { key: 'returnComp', label: '阀后压力补偿', start: 10, end: 12, parse: kpaS8 },
+  { key: 'returnUpper', label: '阀后压力上限', start: 12, end: 14, parse: kpa10 },
+  { key: 'returnLower', label: '阀后压力下限', start: 14, end: 16, parse: kpa10 },
   { key: 'status', label: '状态', start: 16, end: 18, parse: valveStatus },
   { key: 'funcBits', label: '功能位', start: 18, end: 20, parse: valveFunc },
   { key: 'valvePosition', label: '阀门圈数', start: 20, end: 22, parse: v => `${u8(v)}` },
@@ -550,8 +527,8 @@ const PAGE1_LAYOUT_NEW = [
 // 查询第二页 回复 0x4F（15 字节数据域）
 const PAGE2_LAYOUT_NEW = [
   { key: 'timeEnable', label: '分时压力', start: 2, end: 4, parse: v => u8(v) === 1 ? '开启' : '关闭' },
-  { key: 'inletThreshold', label: '进水压力阈值', start: 24, end: 26, parse: kpa10 },
-  { key: 'returnThreshold', label: '回水压力阈值', start: 26, end: 28, parse: kpa10 },
+  { key: 'inletThreshold', label: '阀前压力阈值', start: 24, end: 26, parse: kpa10 },
+  { key: 'returnThreshold', label: '阀后压力阈值', start: 26, end: 28, parse: kpa10 },
   { key: 'battery', label: '电池电压', start: 28, end: 30, parse: v => `${((u8(v) + 300) / 100).toFixed(2)} V` },
   { key: 'signal', label: '信号值', start: 30, end: 32, parse: v => `${u8(v)}` },
 ]
@@ -607,10 +584,10 @@ createPage({
     p_opening: 50, p_modeIdx: 1, p_limitU: 100, p_limitL: 0,
     p_pressure: '20', p_position: 0, p_compIn: '0', p_compRet: '0',
     p_spMin: 30, p_rpOnMin: 30, p_rpOffDay: 3,
-    p_retUpper: '', p_retLower: '',       // 回水压力上/下限（×10KPa 字节值，page1 data[5][6]）
-    p_inletUpper: '', p_inletLower: '',   // 进水压力上/下限（×10KPa 字节值，设备不回读）
+    p_retUpper: '', p_retLower: '',       // 阀后压力上/下限（×10KPa 字节值，page1 data[5][6]）
+    p_inletUpper: '', p_inletLower: '',   // 阀前压力上/下限（×10KPa 字节值，设备不回读）
     p_inletCurrent: 0,                    // 进水当前压力字节（page1 data[0]，作为分时压力上限兜底）
-    p_threshIn: '', p_threshRet: '',      // 进水/回水压力报警阈值（×10KPa 字节值，page2 data[11][12]）
+    p_threshIn: '', p_threshRet: '',      // 进水/阀后压力报警阈值（×10KPa 字节值，page2 data[11][12]）
     p_psEnable: false,                       // 分时压力总使能
     p_slots: [                               // 5 段：on=启用 time=HH:MM kpa=压力
       { id: 0, on: false, time: '00:00', kpa: '' }, { id: 1, on: false, time: '00:00', kpa: '' },
@@ -981,10 +958,10 @@ createPage({
         p_position: b(9),                   // 阀门圈数
         p_limitU: b(11),                    // 圈数上限
         p_limitL: b(12),                    // 圈数下限
-        p_compIn: String(sb(3)),            // 进水压力补偿 KPa（INT8，1KPa/unit）
-        p_compRet: String(sb(4)),           // 回水压力补偿 KPa
-        p_retUpper: String(b(5)),           // 回水压力上限（×10KPa 字节值）
-        p_retLower: String(b(6)),           // 回水压力下限（×10KPa 字节值）
+        p_compIn: String(sb(3)),            // 阀前压力补偿 KPa（INT8，1KPa/unit）
+        p_compRet: String(sb(4)),           // 阀后压力补偿 KPa
+        p_retUpper: String(b(5)),           // 阀后压力上限（×10KPa 字节值）
+        p_retLower: String(b(6)),           // 阀后压力下限（×10KPa 字节值）
         p_inletCurrent: b(0),              // 进水当前压力字节（分时压力上限兜底）
         p_spMin: b(13) * 10,               // 采样周期 分钟（×10 转分）
         p_rpOnMin: b(14) * 10,             // 上报周期(供暖期) 分钟
@@ -1009,8 +986,8 @@ createPage({
     }
     this.setData({
       p_psEnable: u8(p2.slice(2, 4)) === 1, p_slots: slots,
-      p_threshIn: String(u8(p2.slice(24, 26))),    // 进水压力阈值（×10KPa 字节值）
-      p_threshRet: String(u8(p2.slice(26, 28))),   // 回水压力阈值（×10KPa 字节值）
+      p_threshIn: String(u8(p2.slice(24, 26))),    // 阀前压力阈值（×10KPa 字节值）
+      p_threshRet: String(u8(p2.slice(26, 28))),   // 阀后压力阈值（×10KPa 字节值）
     })
   },
   // 仅缓存收到的页数据，不渲染（读取过程中调用，避免布局随分页逐页刷新而抖动）
@@ -1090,7 +1067,7 @@ createPage({
   onSlotTime(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].time`]: e.detail.value }) },
   onSlotKpa(e) { this.setData({ [`p_slots[${e.currentTarget.dataset.idx}].kpa`]: e.detail.value }) },
   sendTimePressure() {
-    // 分时压力上限：优先取进水上限/当前进水压力，未设置则用硬顶 160(=1600KPa=1.6MPa)
+    // 分时压力上限：优先取进水上限/当前阀前压力，未设置则用硬顶 160(=1600KPa=1.6MPa)
     const inletUpper = Number(this.data.p_inletUpper) || this.data.p_inletCurrent
     const max = inletUpper ? Math.min(inletUpper, 160) : 160
 
