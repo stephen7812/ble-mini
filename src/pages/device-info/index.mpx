@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page {{themeClass}}">
     <view wx:if="{{valveTypeId === 'new'}}" class="card riveted">
       <text class="section-title mb-8">压力设置</text>
       <view class="form-item">
@@ -54,13 +54,18 @@ createPage({
     valveTypeId: 'old', targetPressure: '0.2', inletComp: '0',
     targetOpening: 50, workModeIndex: 1,
     workModes: ['通断阀', '回水调节', '室内调节', '流量平衡', '停止'],
+    themeClass: '',
   },
   onLoad() {
     const device = useDeviceStore().currentDevice
     if (!device) { wx.navigateBack(); return }
-    this.setData({ valveTypeId: device.valveTypeId || 'old' })
+    this.setData({ valveTypeId: device.valveTypeId || 'old', themeClass: useDeviceStore().themeClass })
     this.protocol = getProtocol(this.data.valveTypeId)
     this.cmds = this.protocol.commands
+  },
+  onShow() {
+    // 跟随全局主题（风格 × 明暗档）
+    this.setData({ themeClass: useDeviceStore().themeClass })
   },
   setPressure() {
     const mpa = parseFloat(this.data.targetPressure)

@@ -711,8 +711,8 @@ createPage({
 }
 
 .status-badge.online {
-  background: rgba(31, 157, 85, 0.10);
-  border-color: rgba(31, 157, 85, 0.4);
+  background: var(--tint-success);
+  border-color: var(--line-success);
 }
 
 /* 在线 LED 呼吸（绿色辉光由全局 .led.on 提供） */
@@ -1019,19 +1019,19 @@ createPage({
 .info-value.battery-high,
 .info-value.signal-strong {
   color: var(--color-success);
-  text-shadow: 0 0 12rpx rgba(31, 157, 85, 0.45);
+  text-shadow: 0 0 12rpx var(--line-success);
 }
 
 .info-value.battery-medium,
 .info-value.signal-medium {
   color: var(--color-warning);
-  text-shadow: 0 0 12rpx rgba(214, 131, 10, 0.45);
+  text-shadow: 0 0 12rpx var(--line-warning);
 }
 
 .info-value.battery-low,
 .info-value.signal-weak {
   color: var(--color-danger);
-  text-shadow: 0 0 12rpx rgba(216, 57, 43, 0.45);
+  text-shadow: 0 0 12rpx var(--line-danger);
 }
 
 /* ==================== 控制面板：金属面板质感由全局 .card + .riveted 提供 ==================== */
@@ -1240,7 +1240,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
+    0 6rpx 16rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 

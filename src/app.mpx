@@ -21,32 +21,28 @@ createApp({
 /* ============================================================
    多主题架构 · 语义变量层
    ------------------------------------------------------------
-   分两层设计，保证后续新增主题（苹果风/HUD/暖通……）时页面零改动：
+   两个正交维度：
+   1) 风格 themeStyle：industrial（工业机械）/ energy（能源管道）/ blueprint（蓝图工程）
+      挂载类：.theme-<style>
+   2) 明暗 themeLevel：light / dark / darker
+      挂载类：'' / dark / dark darker
 
-   1) 语义变量层（本文件定义，页面【只允许】消费这些变量）：
-      --color-*      语义色（主色/面板/文字/边框……）
-      --grad-*       渐变（面板/主按钮/描边按钮）
-      --deco-*       装饰（铆钉高光/暗影；非金属主题可置 transparent 隐藏）
-      --panel-border-style  面板边框样式（工业 groove / 其他主题 solid）
-      --bg-texture   页面背景纹理（多背景图层）
-      --radius-* / --shadow-*
+   页面根节点 class="{{themeClass}}"（store getter 拼装）：
+     theme-industrial            → 工业风浅档
+     theme-energy dark           → 能源风暗档
+     theme-blueprint dark darker → 蓝图风深黑档
 
-   2) 主题挂载层（按 class 切换）：
-      .theme-<name>           该主题的浅色档
-      .theme-<name>.dark      该主题的深色档
-      页面根节点：class="theme-{{theme}} {{darkMode ? 'dark' : ''}}"
-      theme 来自 store（当前默认 industrial，见 stores/device.js）。
+   兼容回退：page 与裸 .dark/.darker 内置工业风默认值，
+   未挂风格类的旧节点依然正确显示。
 
-   兼容回退：page 与裸 .dark 选择器内置工业风默认值，
-   未挂 theme class 的旧页面依然正确显示。
-
-   新增主题三步：
-   a) 复制一份 .theme-industrial / .theme-industrial.dark 变量块并改名；
-   b) 只改变量值，不碰组件类（.card/.btn-primary 等全部由变量驱动）；
-   c) store 里加主题名 + 页面根节点绑定 theme-{{theme}}。
+   新增风格四步（以 xxx 为例）：
+   a) 复制一份 .theme-xxx 三块（light/dark/darker）并改变量值；
+   b) 只改变量，不碰组件类（.card/.btn-primary 等全部由变量驱动）；
+   c) store 的 THEME_STYLES 白名单加 'xxx'；
+   d) 设置页 styles 数组加一项。
    ============================================================ */
 
-/* ============ 默认主题：工业机械风 · 浅档 ============ */
+/* ============ 工业 mechanical · 浅档（银灰金属 + 青绿点缀）============ */
 page,
 .theme-industrial {
   /* ---- 语义色 ---- */
@@ -55,9 +51,9 @@ page,
   --color-warning: #D6830A;
   --color-danger: #D8392B;
   --color-accent-2: #6E7680;         /* 钢灰辅色（信息类中性色） */
-  --color-bg: #D7DBE1;               /* 银铝拉丝墙面 */
+  --color-bg: #D7DBE1;               /* 银铝墙面 */
   --color-bg-secondary: #C6CCD4;
-  --color-card: #E6E9EE;             /* 卡片基色（实际渲染走 --grad-panel） */
+  --color-card: #E6E9EE;
   --color-text: #20242B;
   --color-text-secondary: #5B616B;
   --color-text-tertiary: #9BA1AB;
@@ -88,7 +84,21 @@ page,
   --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.12);
   --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.20);
 
-  /* ---- 页面背景：银色渐变金属（无纹理）---- */
+  /* ---- 主色 tint / 辉光令牌 ---- */
+  --tint-primary: rgba(13, 148, 136, 0.12);
+  --glow-primary-soft: rgba(13, 148, 136, 0.18);
+  --glow-primary: rgba(13, 148, 136, 0.35);
+  --glow-primary-strong: rgba(13, 148, 136, 0.5);
+
+  /* ---- 状态色 tint / 描边令牌 ---- */
+  --tint-success: rgba(31, 157, 85, 0.12);
+  --line-success: rgba(31, 157, 85, 0.4);
+  --tint-warning: rgba(214, 131, 10, 0.12);
+  --line-warning: rgba(214, 131, 10, 0.4);
+  --tint-danger: rgba(216, 57, 43, 0.12);
+  --line-danger: rgba(216, 57, 43, 0.4);
+
+  /* ---- 页面背景：银灰渐变金属 ---- */
   --bg-texture:
     linear-gradient(180deg, #E6E9EE 0%, #D5DAE1 32%, #CBD1D8 58%, #D4D9DF 82%, #DFE3E9 100%);
 
@@ -101,16 +111,14 @@ page,
   -webkit-font-smoothing: antialiased;
 }
 
-/* ============ 默认主题：工业机械风 · 暗档（枪灰渐变金属）============
-   根类统一用 .dark：无论页面根是 .page / .control-container
-   还是 .monitor-container / .app，挂上 dark 即换暗档。 */
+/* ============ 工业 · 暗档（枪灰渐变 + 琥珀橙）============ */
 .dark,
 .theme-industrial.dark {
   --color-primary: #FF8A1E;          /* 琥珀橙（发光） */
   --color-success: #3DDC84;
   --color-warning: #FFB020;
   --color-danger: #FF453A;
-  --color-accent-2: #8E959F;         /* 钢灰辅色（暗档） */
+  --color-accent-2: #8E959F;
   --color-bg: #2A2D34;
   --color-bg-secondary: #23262C;
   --color-card: #2E323A;
@@ -137,6 +145,18 @@ page,
   --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.4);
   --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.55);
 
+  --tint-primary: rgba(255, 138, 30, 0.14);
+  --glow-primary-soft: rgba(255, 138, 30, 0.22);
+  --glow-primary: rgba(255, 138, 30, 0.35);
+  --glow-primary-strong: rgba(255, 138, 30, 0.55);
+
+  --tint-success: rgba(61, 220, 132, 0.14);
+  --line-success: rgba(61, 220, 132, 0.4);
+  --tint-warning: rgba(255, 176, 32, 0.14);
+  --line-warning: rgba(255, 176, 32, 0.4);
+  --tint-danger: rgba(255, 69, 58, 0.14);
+  --line-danger: rgba(255, 69, 58, 0.4);
+
   --bg-texture:
     linear-gradient(180deg, #3A3E46 0%, #2C2F36 32%, #23262C 58%, #2B2E35 82%, #34383F 100%);
 
@@ -144,49 +164,392 @@ page,
   background-image: var(--bg-texture);
 }
 
-/* ============ 默认主题：工业机械风 · 深黑档（枪灰渐变再压深一级）============
-   页面根节点同时挂 dark + darker 两个 class：dark 打底（局部 .dark 补丁
-   继续生效），darker 在其后覆盖变量。也可单独挂 .theme-industrial.darker。 */
+/* ============ 工业 · 深黑档（近黑 + 琥珀橙）============ */
 .darker,
 .theme-industrial.darker {
-  --color-primary: #FF8A1E;             /* 琥珀橙：深底上更醒目 */
+  --color-primary: #FF8A1E;
   --color-success: #3DDC84;
   --color-warning: #FFB020;
   --color-danger: #FF453A;
-  --color-accent-2: #7A8089;            /* 钢灰辅色：随底色压暗 */
-
-  --color-bg: #1C1E23;                  /* 页面底：近黑枪灰 */
+  --color-accent-2: #7A8089;
+  --color-bg: #1C1E23;
   --color-bg-secondary: #16181C;
   --color-card: #212429;
-
-  --color-text: #E7E9ED;                /* 主文字保持高对比 */
+  --color-text: #E7E9ED;
   --color-text-secondary: #8F95A0;
   --color-text-tertiary: #565B65;
-
   --color-border: #4A4E57;
   --color-border-strong: #33373E;
   --color-fill: rgba(255, 255, 255, 0.06);
   --color-fill-strong: rgba(255, 255, 255, 0.11);
-
-  --color-panel-2: #212429;             /* 亮面板 */
-  --color-panel-3: #17191E;             /* 暗面板：终端屏更沉 */
-  --color-highlight: rgba(255, 255, 255, 0.08);   /* 上沿高光再收敛 */
-  --color-input-inset: rgba(0, 0, 0, 0.45);       /* 内凹暗影再加深 */
-  --color-track: #26292F;               /* 轨道/LED 熄灭态 */
+  --color-panel-2: #212429;
+  --color-panel-3: #17191E;
+  --color-highlight: rgba(255, 255, 255, 0.08);
+  --color-input-inset: rgba(0, 0, 0, 0.45);
+  --color-track: #26292F;
 
   --grad-panel: linear-gradient(145deg, #262A30 0%, #1B1E23 60%, #15171B 100%);
   --grad-btn-primary: linear-gradient(145deg, #FF9F42 0%, #FF8A1E 60%, #D97316 100%);
   --grad-btn-outline: linear-gradient(145deg, #212429 0%, #17191E 100%);
 
-  --deco-rivet: #6E727B;                /* 铆钉：哑光更沉 */
+  --deco-rivet: #6E727B;
   --deco-rivet-shadow: #0C0D10;
 
   --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.5);
   --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.65);
 
-  /* 背景：枪灰渐变的深黑版（同构渐变：亮→暗→亮，色阶整体 -1 级） */
+  --tint-primary: rgba(255, 138, 30, 0.14);
+  --glow-primary-soft: rgba(255, 138, 30, 0.22);
+  --glow-primary: rgba(255, 138, 30, 0.35);
+  --glow-primary-strong: rgba(255, 138, 30, 0.55);
+
+  --tint-success: rgba(61, 220, 132, 0.14);
+  --line-success: rgba(61, 220, 132, 0.4);
+  --tint-warning: rgba(255, 176, 32, 0.14);
+  --line-warning: rgba(255, 176, 32, 0.4);
+  --tint-danger: rgba(255, 69, 58, 0.14);
+  --line-danger: rgba(255, 69, 58, 0.4);
+
   --bg-texture:
     linear-gradient(180deg, #26292F 0%, #1B1E23 32%, #16181C 58%, #1A1D22 82%, #22252B 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============================================================
+   能源管道风 energy：生态绿主色、柔和圆角、无铆钉装饰。
+   布局意象：供水→阀门→回水的管道流向叙事。
+   ============================================================ */
+.theme-energy {
+  --color-primary: #2D6A4F;          /* 生态绿 */
+  --color-success: #40916C;
+  --color-warning: #CC8A2E;
+  --color-danger: #C1554A;
+  --color-accent-2: #7A8B80;         /* 苔灰辅色 */
+  --color-bg: #F2F6F3;
+  --color-bg-secondary: #E6EEE9;
+  --color-card: #FFFFFF;
+  --color-text: #22312A;
+  --color-text-secondary: #5C6E64;
+  --color-text-tertiary: #9AABA1;
+  --color-border: #C2D4C9;
+  --color-border-strong: #9DB8A8;
+  --color-fill: rgba(45, 106, 79, 0.07);
+  --color-fill-strong: rgba(45, 106, 79, 0.13);
+  --color-panel-2: #F7FAF8;
+  --color-panel-3: #EAF1EC;
+  --color-highlight: rgba(255, 255, 255, 0.8);
+  --color-input-inset: rgba(45, 106, 79, 0.08);
+  --color-track: rgba(45, 106, 79, 0.14);
+
+  --grad-panel: linear-gradient(165deg, #FFFFFF 0%, #F4F8F5 100%);
+  --grad-btn-primary: linear-gradient(165deg, #52B788 0%, #2D6A4F 60%, #1B4332 100%);
+  --grad-btn-outline: linear-gradient(165deg, #F7FAF8 0%, #EAF1EC 100%);
+
+  /* 能源风无金属铆钉：置透明隐藏 */
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;       /* 柔和细边 */
+
+  --radius-lg: 28rpx;                /* 圆角放大一档 */
+  --radius: 20rpx;
+  --radius-sm: 14rpx;
+  --shadow-card: 0 6rpx 20rpx rgba(45, 106, 79, 0.10);
+  --shadow-float: 0 14rpx 36rpx rgba(45, 106, 79, 0.16);
+
+  --tint-primary: rgba(45, 106, 79, 0.12);
+  --glow-primary-soft: rgba(45, 106, 79, 0.18);
+  --glow-primary: rgba(45, 106, 79, 0.32);
+  --glow-primary-strong: rgba(45, 106, 79, 0.5);
+
+  --tint-success: rgba(64, 145, 108, 0.12);
+  --line-success: rgba(64, 145, 108, 0.4);
+  --tint-warning: rgba(204, 138, 46, 0.12);
+  --line-warning: rgba(204, 138, 46, 0.4);
+  --tint-danger: rgba(193, 85, 74, 0.12);
+  --line-danger: rgba(193, 85, 74, 0.4);
+
+  --bg-texture:
+    linear-gradient(180deg, #F7FAF8 0%, #F0F5F1 38%, #EAF1EC 62%, #F2F6F3 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 能源 · 暗档（深林绿 + 薄荷绿）============ */
+.theme-energy.dark {
+  --color-primary: #74C69D;          /* 薄荷绿（发光） */
+  --color-success: #52B788;
+  --color-warning: #F0B454;
+  --color-danger: #E5735F;
+  --color-accent-2: #8FA398;
+  --color-bg: #1C2B23;
+  --color-bg-secondary: #16221B;
+  --color-card: #233529;
+  --color-text: #E6F0E9;
+  --color-text-secondary: #A3B5AA;
+  --color-text-tertiary: #64786C;
+  --color-border: #3A5245;
+  --color-border-strong: #2B3F34;
+  --color-fill: rgba(116, 198, 157, 0.08);
+  --color-fill-strong: rgba(116, 198, 157, 0.14);
+  --color-panel-2: #233529;
+  --color-panel-3: #1B2B22;
+  --color-highlight: rgba(255, 255, 255, 0.06);
+  --color-input-inset: rgba(0, 0, 0, 0.30);
+  --color-track: #2A3E33;
+
+  --grad-panel: linear-gradient(165deg, #2A4033 0%, #1F3128 60%, #182720 100%);
+  --grad-btn-primary: linear-gradient(165deg, #8FD4AF 0%, #52B788 60%, #3E8E68 100%);
+  --grad-btn-outline: linear-gradient(165deg, #233529 0%, #1B2B22 100%);
+
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;
+
+  --shadow-card: 0 6rpx 20rpx rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 14rpx 36rpx rgba(0, 0, 0, 0.55);
+
+  --tint-primary: rgba(116, 198, 157, 0.14);
+  --glow-primary-soft: rgba(116, 198, 157, 0.22);
+  --glow-primary: rgba(116, 198, 157, 0.35);
+  --glow-primary-strong: rgba(116, 198, 157, 0.55);
+
+  --tint-success: rgba(82, 183, 136, 0.14);
+  --line-success: rgba(82, 183, 136, 0.4);
+  --tint-warning: rgba(240, 180, 84, 0.14);
+  --line-warning: rgba(240, 180, 84, 0.4);
+  --tint-danger: rgba(229, 115, 95, 0.14);
+  --line-danger: rgba(229, 115, 95, 0.4);
+
+  --bg-texture:
+    linear-gradient(180deg, #24382D 0%, #1C2B23 35%, #16221B 60%, #1E2F26 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 能源 · 深黑档（近黑林绿）============ */
+.theme-energy.darker {
+  --color-primary: #74C69D;
+  --color-success: #52B788;
+  --color-warning: #F0B454;
+  --color-danger: #E5735F;
+  --color-accent-2: #7E9186;
+  --color-bg: #121D17;
+  --color-bg-secondary: #0E1712;
+  --color-card: #19271F;
+  --color-text: #E6F0E9;
+  --color-text-secondary: #93A698;
+  --color-text-tertiary: #55685C;
+  --color-border: #2E4437;
+  --color-border-strong: #1F3128;
+  --color-fill: rgba(116, 198, 157, 0.06);
+  --color-fill-strong: rgba(116, 198, 157, 0.11);
+  --color-panel-2: #19271F;
+  --color-panel-3: #121C16;
+  --color-highlight: rgba(255, 255, 255, 0.05);
+  --color-input-inset: rgba(0, 0, 0, 0.40);
+  --color-track: #1C2A22;
+
+  --grad-panel: linear-gradient(165deg, #20332A 0%, #161F1A 60%, #101812 100%);
+  --grad-btn-primary: linear-gradient(165deg, #8FD4AF 0%, #52B788 60%, #3E8E68 100%);
+  --grad-btn-outline: linear-gradient(165deg, #19271F 0%, #121C16 100%);
+
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;
+
+  --shadow-card: 0 6rpx 20rpx rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 14rpx 36rpx rgba(0, 0, 0, 0.65);
+
+  --tint-primary: rgba(116, 198, 157, 0.14);
+  --glow-primary-soft: rgba(116, 198, 157, 0.22);
+  --glow-primary: rgba(116, 198, 157, 0.35);
+  --glow-primary-strong: rgba(116, 198, 157, 0.55);
+
+  --tint-success: rgba(82, 183, 136, 0.14);
+  --line-success: rgba(82, 183, 136, 0.4);
+  --tint-warning: rgba(240, 180, 84, 0.14);
+  --line-warning: rgba(240, 180, 84, 0.4);
+  --tint-danger: rgba(229, 115, 95, 0.14);
+  --line-danger: rgba(229, 115, 95, 0.4);
+
+  --bg-texture:
+    linear-gradient(180deg, #1B2C23 0%, #121D17 35%, #0E1712 60%, #16241C 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============================================================
+   蓝图工程风 blueprint：工程图纸网格底、小圆角线框面板、
+   蓝白双色。浅档=白图纸，暗档=经典深蓝蓝图。
+   ============================================================ */
+.theme-blueprint {
+  --color-primary: #2E6FB0;          /* 制图蓝 */
+  --color-success: #2F8F5B;
+  --color-warning: #C88A2E;
+  --color-danger: #C05046;
+  --color-accent-2: #7A8BA3;         /* 蓝灰辅色 */
+  --color-bg: #F4F7FB;
+  --color-bg-secondary: #EAF0F7;
+  --color-card: #FFFFFF;
+  --color-text: #1C2B3A;
+  --color-text-secondary: #52657A;
+  --color-text-tertiary: #93A3B5;
+  --color-border: #C3D2E2;
+  --color-border-strong: #9AB0C7;
+  --color-fill: rgba(46, 111, 176, 0.07);
+  --color-fill-strong: rgba(46, 111, 176, 0.13);
+  --color-panel-2: #F8FAFD;
+  --color-panel-3: #EDF2F8;
+  --color-highlight: rgba(255, 255, 255, 0.7);
+  --color-input-inset: rgba(28, 43, 58, 0.08);
+  --color-track: rgba(28, 43, 58, 0.14);
+
+  --grad-panel: linear-gradient(170deg, #FFFFFF 0%, #F2F6FA 100%);
+  --grad-btn-primary: linear-gradient(170deg, #4C8BC9 0%, #2E6FB0 55%, #1F5485 100%);
+  --grad-btn-outline: linear-gradient(170deg, #F8FAFD 0%, #EDF2F8 100%);
+
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;       /* 线框制图边 */
+
+  --radius-lg: 12rpx;                /* 技术感小圆角 */
+  --radius: 8rpx;
+  --radius-sm: 6rpx;
+  --shadow-card: 0 2rpx 10rpx rgba(28, 43, 58, 0.10);
+  --shadow-float: 0 10rpx 28rpx rgba(28, 43, 58, 0.16);
+
+  --tint-primary: rgba(46, 111, 176, 0.12);
+  --glow-primary-soft: rgba(46, 111, 176, 0.18);
+  --glow-primary: rgba(46, 111, 176, 0.32);
+  --glow-primary-strong: rgba(46, 111, 176, 0.5);
+
+  --tint-success: rgba(47, 143, 91, 0.12);
+  --line-success: rgba(47, 143, 91, 0.4);
+  --tint-warning: rgba(200, 138, 46, 0.12);
+  --line-warning: rgba(200, 138, 46, 0.4);
+  --tint-danger: rgba(192, 80, 70, 0.12);
+  --line-danger: rgba(192, 80, 70, 0.4);
+
+  /* 图纸网格：浅蓝细线 + 白纸渐变（蓝图风签名底纹） */
+  --bg-texture:
+    repeating-linear-gradient(0deg, rgba(46, 111, 176, 0.05) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(46, 111, 176, 0.05) 0 1px, transparent 1px 24px),
+    linear-gradient(180deg, #F7FAFC 0%, #F0F5FA 55%, #F4F7FB 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 蓝图 · 暗档（经典深蓝图纸 + 青蓝线）============ */
+.theme-blueprint.dark {
+  --color-primary: #7FC4F8;          /* 青蓝线稿色 */
+  --color-success: #6BCB8B;
+  --color-warning: #F0C24B;
+  --color-danger: #F07A6A;
+  --color-accent-2: #8CA2C4;
+  --color-bg: #16233F;
+  --color-bg-secondary: #101A30;
+  --color-card: #1C2C4E;
+  --color-text: #DCE9F8;
+  --color-text-secondary: #93A7C7;
+  --color-text-tertiary: #5A6E92;
+  --color-border: #3A5178;
+  --color-border-strong: #2A3C5E;
+  --color-fill: rgba(127, 196, 248, 0.08);
+  --color-fill-strong: rgba(127, 196, 248, 0.14);
+  --color-panel-2: #1C2C4E;
+  --color-panel-3: #152340;
+  --color-highlight: rgba(255, 255, 255, 0.07);
+  --color-input-inset: rgba(0, 0, 0, 0.35);
+  --color-track: #24365C;
+
+  --grad-panel: linear-gradient(170deg, #22355C 0%, #1A2A4C 60%, #141F3A 100%);
+  --grad-btn-primary: linear-gradient(170deg, #5FB0E8 0%, #3B82C4 60%, #2A5E94 100%);
+  --grad-btn-outline: linear-gradient(170deg, #1C2C4E 0%, #152340 100%);
+
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;
+
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.55);
+
+  --tint-primary: rgba(127, 196, 248, 0.14);
+  --glow-primary-soft: rgba(127, 196, 248, 0.22);
+  --glow-primary: rgba(127, 196, 248, 0.35);
+  --glow-primary-strong: rgba(127, 196, 248, 0.55);
+
+  --tint-success: rgba(107, 203, 139, 0.14);
+  --line-success: rgba(107, 203, 139, 0.4);
+  --tint-warning: rgba(240, 194, 75, 0.14);
+  --line-warning: rgba(240, 194, 75, 0.4);
+  --tint-danger: rgba(240, 122, 106, 0.14);
+  --line-danger: rgba(240, 122, 106, 0.4);
+
+  --bg-texture:
+    repeating-linear-gradient(0deg, rgba(127, 196, 248, 0.06) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(127, 196, 248, 0.06) 0 1px, transparent 1px 24px),
+    linear-gradient(180deg, #1C2C4E 0%, #16233F 50%, #101A30 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 蓝图 · 深黑档（午夜图纸）============ */
+.theme-blueprint.darker {
+  --color-primary: #7FC4F8;
+  --color-success: #6BCB8B;
+  --color-warning: #F0C24B;
+  --color-danger: #F07A6A;
+  --color-accent-2: #7B90B4;
+  --color-bg: #0E1729;
+  --color-bg-secondary: #0A1120;
+  --color-card: #14213B;
+  --color-text: #DCE9F8;
+  --color-text-secondary: #8298BC;
+  --color-text-tertiary: #4C5F84;
+  --color-border: #2E4266;
+  --color-border-strong: #1E2F4E;
+  --color-fill: rgba(127, 196, 248, 0.06);
+  --color-fill-strong: rgba(127, 196, 248, 0.11);
+  --color-panel-2: #14213B;
+  --color-panel-3: #0F1B33;
+  --color-highlight: rgba(255, 255, 255, 0.05);
+  --color-input-inset: rgba(0, 0, 0, 0.45);
+  --color-track: #1A2A4A;
+
+  --grad-panel: linear-gradient(170deg, #1A2A4C 0%, #131F3C 60%, #0D1730 100%);
+  --grad-btn-primary: linear-gradient(170deg, #5FB0E8 0%, #3B82C4 60%, #2A5E94 100%);
+  --grad-btn-outline: linear-gradient(170deg, #14213B 0%, #0F1B33 100%);
+
+  --deco-rivet: transparent;
+  --deco-rivet-shadow: transparent;
+  --panel-border-style: solid;
+
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.65);
+
+  --tint-primary: rgba(127, 196, 248, 0.14);
+  --glow-primary-soft: rgba(127, 196, 248, 0.22);
+  --glow-primary: rgba(127, 196, 248, 0.35);
+  --glow-primary-strong: rgba(127, 196, 248, 0.55);
+
+  --tint-success: rgba(107, 203, 139, 0.14);
+  --line-success: rgba(107, 203, 139, 0.4);
+  --tint-warning: rgba(240, 194, 75, 0.14);
+  --line-warning: rgba(240, 194, 75, 0.4);
+  --tint-danger: rgba(240, 122, 106, 0.14);
+  --line-danger: rgba(240, 122, 106, 0.4);
+
+  --bg-texture:
+    repeating-linear-gradient(0deg, rgba(127, 196, 248, 0.05) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(127, 196, 248, 0.05) 0 1px, transparent 1px 24px),
+    linear-gradient(180deg, #14213B 0%, #0E1729 50%, #0A1120 100%);
 
   background-color: var(--color-bg);
   background-image: var(--bg-texture);
@@ -201,7 +564,7 @@ page,
   letter-spacing: 1rpx;
 }
 
-/* ---------- 面板：金属渐变 + groove 边框 ---------- */
+/* ---------- 面板 ---------- */
 .card {
   position: relative;
   background: var(--grad-panel);
@@ -215,7 +578,7 @@ page,
     var(--shadow-card);
 }
 
-/* ---------- 铆钉角标：四角螺丝（挂在面板上；非金属主题变量置透明即隐藏）---------- */
+/* ---------- 铆钉角标：四角螺丝（工业风专属；其他风格变量置透明即隐藏）---------- */
 .riveted { position: relative; }
 .riveted::before,
 .riveted::after {
@@ -250,7 +613,7 @@ page,
 .led.err  { background: var(--color-danger);  box-shadow: 0 0 10rpx var(--color-danger); }
 .led.accent { background: var(--color-primary); box-shadow: 0 0 10rpx var(--color-primary); }
 
-/* ---------- 章节标题：工业铭牌风 ---------- */
+/* ---------- 章节标题 ---------- */
 .section-title {
   font-size: 24rpx;
   font-weight: 700;
@@ -274,7 +637,7 @@ page,
 .mb-8 { margin-bottom: 16rpx; }
 .ml-8 { margin-left: 16rpx; }
 
-/* ---------- 按钮：金属实体键 ---------- */
+/* ---------- 主按钮 ---------- */
 .btn-primary {
   background: var(--grad-btn-primary);
   color: #fff;
@@ -288,7 +651,7 @@ page,
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
+    0 6rpx 16rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 .btn-primary:active { opacity: 0.9; transform: scale(0.98) translateY(2rpx); filter: brightness(0.94); }
@@ -308,7 +671,7 @@ page,
 }
 .btn-outline:active { filter: brightness(0.95); transform: translateY(2rpx); }
 
-/* ---------- 标签：工业铭牌小卡 ---------- */
+/* ---------- 标签（tint/line 令牌驱动，随风格+明暗自适应）---------- */
 .tag {
   display: inline-flex;
   align-items: center;
@@ -321,11 +684,11 @@ page,
   background: var(--color-panel-2);
   color: var(--color-text-secondary);
 }
-.tag-success { background: rgba(31, 157, 85, 0.12); color: var(--color-success); border-color: rgba(31, 157, 85, 0.4); }
-.tag-warning { background: rgba(214, 131, 10, 0.12); color: var(--color-warning); border-color: rgba(214, 131, 10, 0.4); }
-.tag-error   { background: rgba(216, 57, 43, 0.12); color: var(--color-danger); border-color: rgba(216, 57, 43, 0.4); }
+.tag-success { background: var(--tint-success); color: var(--color-success); border-color: var(--line-success); }
+.tag-warning { background: var(--tint-warning); color: var(--color-warning); border-color: var(--line-warning); }
+.tag-error   { background: var(--tint-danger); color: var(--color-danger); border-color: var(--line-danger); }
 
-/* ---------- 输入框：内凹金属槽 ---------- */
+/* ---------- 输入框：内凹槽 ---------- */
 .field-input {
   background: var(--color-panel-2);
   border: 2rpx solid var(--color-border);
@@ -336,7 +699,7 @@ page,
 .field-input:focus,
 .field-input.field-focus { border-color: var(--color-primary); }
 
-/* ---------- 选项按钮（蓝牙调试等页的选择卡）---------- */
+/* ---------- 选项按钮 ---------- */
 .sel-option {
   background: var(--color-panel-2);
   border: 2rpx solid var(--color-border);
@@ -366,7 +729,7 @@ page,
   border-radius: 6rpx;
 }
 
-/* ---------- 命令按钮（控制页）---------- */
+/* ---------- 命令按钮 ---------- */
 .btn-cmd {
   background: var(--color-panel-2);
   border: 2rpx solid var(--color-border);
@@ -386,9 +749,9 @@ page,
   letter-spacing: 1rpx;
 }
 .status-tag.on {
-  background: rgba(31, 157, 85, 0.12);
+  background: var(--tint-success);
   color: var(--color-success);
-  border: 1rpx solid rgba(31, 157, 85, 0.4);
+  border: 1rpx solid var(--line-success);
 }
 .status-tag.off {
   background: var(--color-panel-3);
@@ -407,7 +770,7 @@ page,
 /* ---------- 日志条 ---------- */
 .log-item { border: 1rpx solid var(--color-border); border-radius: var(--radius-sm); }
 
-/* ---------- 参数输入（控制页）---------- */
+/* ---------- 参数输入 ---------- */
 .param-input,
 .param-input-sm {
   background: var(--color-panel-2);
@@ -425,13 +788,13 @@ page,
 
 /* ---------- 命令特殊按钮 ---------- */
 .btn-cmd-full {
-  background: rgba(31, 157, 85, 0.10);
-  border: 1rpx solid rgba(31, 157, 85, 0.4);
+  background: var(--tint-success);
+  border: 1rpx solid var(--line-success);
   border-radius: var(--radius-sm);
 }
 .btn-cmd-close {
-  background: rgba(216, 57, 43, 0.10);
-  border: 1rpx solid rgba(216, 57, 43, 0.4);
+  background: var(--tint-danger);
+  border: 1rpx solid var(--line-danger);
   border-radius: var(--radius-sm);
 }
 .btn-cmd-primary { border-color: var(--color-primary); }

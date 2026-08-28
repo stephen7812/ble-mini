@@ -1,5 +1,5 @@
 <template>
-  <view class="page">
+  <view class="page {{themeClass}}">
     <view class="scan-status riveted {{isScanning ? 'scanning' : ''}}" bindtap="toggleScan">
       <view class="radar">
         <view class="radar-ring r1"></view>
@@ -61,7 +61,11 @@ function getManufacturer(device) {
 }
 
 createPage({
-  data: { isScanning: false, devices: [] },
+  data: { isScanning: false, devices: [], themeClass: '' },
+  onShow() {
+    // 跟随全局主题（风格 × 明暗档）
+    this.setData({ themeClass: useDeviceStore().themeClass })
+  },
   toggleScan() {
     this.data.isScanning ? this.stopScanInternal() : this.startScanInternal()
   },

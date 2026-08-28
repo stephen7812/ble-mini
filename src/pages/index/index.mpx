@@ -201,15 +201,11 @@ createPage({
   },
 
   onShow() {
-    // 头图是工业金属面板：浅档浅灰底配黑色状态栏图标、暗两档深底配白色图标（深黑档底色更深）。
+    // 导航栏颜色随「风格 × 明暗档」变化（store.navBarColors 统一计算）。
     // 从别的页面（用系统导航栏，图标默认黑色）返回时状态栏颜色会被带黑，
     // 所以每次 onShow 都要重新设一遍。
     const store = useDeviceStore()
-    const level = store.themeLevel
-    wx.setNavigationBarColor({
-      frontColor: level === 'light' ? '#000000' : '#ffffff',
-      backgroundColor: level === 'light' ? '#D7DBE1' : level === 'darker' ? '#1C1E23' : '#2A2D34',
-    })
+    wx.setNavigationBarColor(store.navBarColors)
 
     const auth = useAuthStore()
     const displayName = auth.user.realname || auth.user.username

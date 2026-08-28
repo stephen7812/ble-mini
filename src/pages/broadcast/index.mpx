@@ -1290,29 +1290,12 @@ createPage({
    蓝色零残留：原 iOS 蓝（#007AFF / #0A84FF 系）已全部替换。
    ================================================================ */
 
-/* ---------- 页面容器：透出 page 层拉丝金属纹理 ---------- */
+/* ---------- 页面容器：透出 page 层主题背景纹理 ----------
+   状态 tint 令牌（tint 系与 line 系）已收编到 app.mpx 全局主题层，
+   随风格（工业、能源、蓝图）与明暗档自动切换，此处不再局部覆写。 */
 .app {
-  /* 状态 tint：与 app.mpx 全局 .tag-* 同源（状态色 12% 底 / 40% 描边） */
-  --tint-success: rgba(31, 157, 85, 0.12);
-  --line-success: rgba(31, 157, 85, 0.4);
-  --tint-warning: rgba(214, 131, 10, 0.12);
-  --line-warning: rgba(214, 131, 10, 0.4);
-  --tint-danger: rgba(216, 57, 43, 0.12);
-  --line-danger: rgba(216, 57, 43, 0.4);
-  --tint-primary: rgba(13, 148, 136, 0.12);
-
   min-height: 100vh;
   padding: 0 0 120rpx 0;
-}
-/* 暗档补丁①：状态 tint 换暗档发光色；面板/文字/边框由全局语义变量自动切换 */
-.app.dark {
-  --tint-success: rgba(61, 220, 132, 0.14);
-  --line-success: rgba(61, 220, 132, 0.4);
-  --tint-warning: rgba(255, 176, 32, 0.14);
-  --line-warning: rgba(255, 176, 32, 0.4);
-  --tint-danger: rgba(255, 69, 58, 0.14);
-  --line-danger: rgba(255, 69, 58, 0.4);
-  --tint-primary: rgba(255, 138, 30, 0.14);
 }
 
 /* ======================= SHARED ========================== */
@@ -1428,7 +1411,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 8rpx 20rpx rgba(13, 148, 136, 0.35);
+    0 8rpx 20rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform .15s ease, filter .15s ease;
 }
@@ -1487,7 +1470,7 @@ createPage({
 .db-alert-title { font-size: 22rpx; font-weight: 700; color: var(--color-danger); letter-spacing: 1rpx; }
 .db-alert-text { font-size: 24rpx; color: var(--color-text); line-height: 1.4; }
 @keyframes alertPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(216, 57, 43, 0.35); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--line-danger); }
   60% { box-shadow: 0 0 0 12rpx rgba(216, 57, 43, 0); }
 }
 
@@ -1720,7 +1703,7 @@ createPage({
 }
 .pf-input:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx var(--glow-primary-soft);
 }
 .pf-unit { font-size: 24rpx; color: var(--color-text-tertiary); flex-shrink: 0; width: 40rpx; text-align: center; }
 /* 设定按钮：橙色金属实体键 */
@@ -1733,7 +1716,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 4rpx 12rpx rgba(13, 148, 136, 0.3);
+    0 4rpx 12rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 .pf-btn::after { border: none; }
@@ -1782,7 +1765,7 @@ createPage({
 }
 .ps-kpa:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx var(--glow-primary-soft);
 }
 .ps-unit { font-size: 22rpx; color: var(--color-text-tertiary); flex-shrink: 0; }
 .ps-sw { transform: scale(0.68); flex-shrink: 0; }
@@ -1832,7 +1815,7 @@ createPage({
 }
 .ctrl-addr:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx var(--glow-primary-soft);
 }
 .ctrl-addr-flex { flex: 1; width: auto; }
 /* 扫码按钮：橙色金属实体键 */
@@ -1848,7 +1831,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 4rpx 12rpx rgba(13, 148, 136, 0.3);
+    0 4rpx 12rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform .15s ease, filter .15s ease;
 }
@@ -2129,24 +2112,24 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25),
-    0 8rpx 20rpx rgba(255, 138, 30, 0.4);
+    0 8rpx 20rpx var(--glow-primary);
 }
 .app.dark .pf-btn {
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25),
-    0 4rpx 12rpx rgba(255, 138, 30, 0.35);
+    0 4rpx 12rpx var(--glow-primary);
 }
 .app.dark .ctrl-scan-btn {
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25),
-    0 4rpx 12rpx rgba(255, 138, 30, 0.35);
+    0 4rpx 12rpx var(--glow-primary);
 }
 .app.dark .pf-input:focus,
 .app.dark .ps-kpa:focus,
 .app.dark .ctrl-addr:focus {
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(255, 138, 30, 0.22);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx var(--glow-primary-soft);
 }
 </style>
 

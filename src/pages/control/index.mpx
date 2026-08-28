@@ -1284,7 +1284,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
+    0 6rpx 16rpx var(--glow-primary);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
@@ -1438,8 +1438,8 @@ createPage({
   gap: 16rpx;
   padding: 24rpx 28rpx;
   margin-top: 8rpx;
-  background: rgba(214, 131, 10, 0.08);
-  border: 2rpx var(--panel-border-style) rgba(214, 131, 10, 0.45);
+  background: var(--tint-warning);
+  border: 2rpx var(--panel-border-style) var(--line-warning);
   border-radius: var(--radius-lg);
   box-shadow:
     inset 2rpx 2rpx 0 var(--color-highlight),
@@ -1477,12 +1477,12 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25),
-    0 6rpx 16rpx rgba(255, 138, 30, 0.35);
+    0 6rpx 16rpx var(--glow-primary);
 }
 
 .control-container.dark .safety-banner {
-  background: rgba(255, 176, 32, 0.08);
-  border-color: rgba(255, 176, 32, 0.4);
+  background: var(--tint-warning);
+  border-color: var(--line-warning);
 }
 </style>
 
@@ -1507,12 +1507,12 @@ createPage({
 .tp-slot-switch .wx-switch-input.checked {
   background: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 12rpx rgba(13, 148, 136, 0.5) !important;
+  box-shadow: 0 0 12rpx var(--glow-primary-strong) !important;
 }
 
 .control-container.dark .tp-main-switch .wx-switch-input.checked,
 .control-container.dark .tp-slot-switch .wx-switch-input.checked {
-  box-shadow: 0 0 14rpx rgba(255, 138, 30, 0.55) !important;
+  box-shadow: 0 0 14rpx var(--glow-primary-strong) !important;
 }
 </style>
 

@@ -19,7 +19,7 @@
               <view class="pv-block"></view>
               <view class="pv-dot"></view>
             </view>
-            <text class="mode-name">银灰浅色</text>
+            <text class="mode-name">浅色</text>
             <view class="mode-led led {{themeLevel === 'light' ? 'on' : ''}}"></view>
           </view>
           <view
@@ -32,7 +32,7 @@
               <view class="pv-block"></view>
               <view class="pv-dot"></view>
             </view>
-            <text class="mode-name">枪灰暗色</text>
+            <text class="mode-name">暗色</text>
             <view class="mode-led led {{themeLevel === 'dark' ? 'on' : ''}}"></view>
           </view>
           <view
@@ -45,7 +45,7 @@
               <view class="pv-block"></view>
               <view class="pv-dot"></view>
             </view>
-            <text class="mode-name">深黑夜间</text>
+            <text class="mode-name">深黑</text>
             <view class="mode-led led {{themeLevel === 'darker' ? 'on' : ''}}"></view>
           </view>
         </view>
@@ -61,20 +61,31 @@
       </view>
       <view class="panel-body">
         <view
-          class="style-option active"
+          class="style-option {{themeStyle === item.id ? 'active' : ''}}"
+          wx:for="{{styles}}"
+          wx:key="id"
+          bindtap="applyStyle"
+          data-id="{{item.id}}"
         >
+          <view class="style-swatches">
+            <view class="swatch" style="background: {{item.colors[0]}}"></view>
+            <view class="swatch" style="background: {{item.colors[1]}}"></view>
+            <view class="swatch" style="background: {{item.colors[2]}}"></view>
+          </view>
           <view class="style-info">
             <view class="style-head">
-              <text class="style-name">工业机械风</text>
-              <view class="led on"></view>
+              <text class="style-name">{{item.name}}</text>
+              <view class="led {{themeStyle === item.id ? 'on' : ''}}"></view>
             </view>
-            <text class="style-desc">拉丝金属面板、铆钉边框、LED 指示灯与数码读数</text>
+            <text class="style-desc">{{item.desc}}</text>
           </view>
-          <text class="style-check">✓</text>
+          <view class="style-check" wx:if="{{themeStyle === item.id}}">
+            <text class="style-check-icon">✓</text>
+          </view>
         </view>
 
         <view class="style-coming">
-          <text class="coming-text">更多风格（苹果风 / HUD 仪表 / 暖通暖色…）规划中，敬请期待</text>
+          <text class="coming-text">后续将加入更多风格（苹果简约 / HUD 仪表 / 暖通暖色…），敬请期待</text>
         </view>
       </view>
     </view>
@@ -93,7 +104,7 @@
         </view>
         <view class="about-row">
           <text class="about-label">当前风格</text>
-          <text class="about-value mono">INDUSTRIAL</text>
+          <text class="about-value">{{styleName}}</text>
         </view>
       </view>
     </view>
@@ -104,33 +115,76 @@
 import { createPage } from '@mpxjs/core'
 import { useDeviceStore } from '../../stores/device'
 
+/** 风格目录：新增风格时在 app.mpx 加变量块 + store 白名单登记后，在此加一项 */
+const STYLE_CATALOG = [
+  {
+    id: 'industrial',
+    name: '工业机械风',
+    desc: '拉丝金属面板、铆钉边框、LED 指示灯与数码读数',
+    colors: ['#0D9488', '#D7DBE1', '#FF8A1E'],
+  },
+  {
+    id: 'energy',
+    name: '能源管道风',
+    desc: '生态绿主色、柔和圆角、清爽浅底与深林绿夜间档',
+    colors: ['#2D6A4F', '#F2F6F3', '#74C69D'],
+  },
+  {
+    id: 'blueprint',
+    name: '蓝图工程风',
+    desc: '工程图纸网格底、线框面板、白图纸与经典深蓝蓝图',
+    colors: ['#2E6FB0', '#F4F7FB', '#7FC4F8'],
+  },
+]
+
 createPage({
   data: {
     themeClass: '',
     themeLevel: 'light',
+    themeStyle: 'industrial',
+    styleName: '工业机械风',
+    styles: STYLE_CATALOG,
   },
 
   onShow() {
     const store = useDeviceStore()
-    this.setData({
-      themeClass: store.themeClass,
-      themeLevel: store.themeLevel,
-    })
+    // 导航栏随风格 × 明暗档变化
+    wx.setNavigationBarColor(store.navBarColors)
+    this.syncFromStore(store)
   },
 
   methods: {
+    syncFromStore(store) {
+      const meta = STYLE_CATALOG.find(s => s.id === store.themeStyle)
+      this.setData({
+        themeClass: store.themeClass,
+        themeLevel: store.themeLevel,
+        themeStyle: store.themeStyle,
+        styleName: meta ? meta.name : store.themeStyle,
+      })
+    },
+
     // 明暗档选择：点击即应用并持久化，全 app 生效
     applyLevel(e) {
       const level = e.currentTarget.dataset.level
       const store = useDeviceStore()
       if (level === store.themeLevel) return
       store.setThemeLevel(level)
-      this.setData({
-        themeClass: store.themeClass,
-        themeLevel: store.themeLevel,
-      })
-      const names = { light: '银灰浅色', dark: '枪灰暗色', darker: '深黑夜间' }
+      this.syncFromStore(store)
+      const names = { light: '浅色', dark: '暗色', darker: '深黑' }
       wx.showToast({ title: `已切换：${names[level]}`, icon: 'none' })
+    },
+
+    // 界面风格选择：点击即应用并持久化，全 app 生效
+    applyStyle(e) {
+      const id = e.currentTarget.dataset.id
+      const store = useDeviceStore()
+      if (id === store.themeStyle) return
+      store.setThemeStyle(id)
+      this.syncFromStore(store)
+      wx.setNavigationBarColor(store.navBarColors)
+      const meta = STYLE_CATALOG.find(s => s.id === id)
+      wx.showToast({ title: `已切换：${meta ? meta.name : id}`, icon: 'none' })
     },
   },
 })
@@ -192,7 +246,7 @@ createPage({
 .mode-name { font-size: 24rpx; color: var(--color-text); font-weight: 600; }
 .mode-led { margin-top: -6rpx; }
 
-/* 缩略预览：小面板模拟各档观感 */
+/* 缩略预览：小面板模拟各档观感（浅档亮底/暗档深底 + 主色点亮） */
 .mode-preview {
   width: 100%; height: 120rpx;
   border-radius: var(--radius-sm);
@@ -204,17 +258,14 @@ createPage({
 .pv-bar { height: 12rpx; border-radius: 4rpx; width: 70%; }
 .pv-block { flex: 1; border-radius: 6rpx; width: 100%; }
 .pv-dot { width: 14rpx; height: 14rpx; border-radius: 50%; }
-/* 浅档预览 */
 .mode-light { background: #E6E9EE; }
 .mode-light .pv-bar { background: #9BA1AB; }
 .mode-light .pv-block { background: #F3F5F8; border: 1rpx solid #C6CCD4; }
-.mode-light .pv-dot { background: #0D9488; box-shadow: 0 0 8rpx rgba(13, 148, 136, 0.6); }
-/* 枪灰预览 */
+.mode-light .pv-dot { background: var(--color-primary); box-shadow: 0 0 8rpx var(--glow-primary-strong); }
 .mode-dark { background: #2A2D34; }
 .mode-dark .pv-bar { background: #565A64; }
 .mode-dark .pv-block { background: #2E323A; border: 1rpx solid #3A3E47; }
 .mode-dark .pv-dot { background: #FF8A1E; box-shadow: 0 0 8rpx rgba(255, 138, 30, 0.6); }
-/* 深黑预览 */
 .mode-darker { background: #16181C; }
 .mode-darker .pv-bar { background: #33373E; }
 .mode-darker .pv-block { background: #1C1E23; border: 1rpx solid #2A2D33; }
@@ -223,11 +274,25 @@ createPage({
 /* ========== 风格选择 ========== */
 .style-option {
   display: flex; align-items: center; gap: 20rpx;
-  padding: 26rpx 26rpx;
-  border: 2rpx solid var(--color-primary);
+  padding: 26rpx;
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius);
-  background: var(--color-fill);
+  background: var(--color-panel-2);
   box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
+  margin-bottom: 20rpx;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.style-option:active { filter: brightness(0.96); }
+.style-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-fill);
+}
+/* 风格色板：三枚色点展示该风格的主色/底色/暗档主色 */
+.style-swatches { display: flex; flex-direction: column; gap: 8rpx; flex-shrink: 0; }
+.swatch {
+  width: 36rpx; height: 36rpx; border-radius: 50%;
+  border: 2rpx solid var(--color-border);
+  box-shadow: inset 0 0 4rpx rgba(0, 0, 0, 0.12);
 }
 .style-info { flex: 1; overflow: hidden; }
 .style-head { display: flex; align-items: center; gap: 14rpx; }
@@ -240,15 +305,14 @@ createPage({
   width: 48rpx; height: 48rpx; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  color: #fff; font-size: 28rpx; font-weight: 700;
   background: var(--grad-btn-primary);
   border: 2rpx var(--panel-border-style) var(--color-border-strong);
   box-shadow: inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35);
 }
+.style-check-icon { color: #fff; font-size: 28rpx; font-weight: 700; }
 
 /* 后续风格占位 */
 .style-coming {
-  margin-top: 20rpx;
   padding: 24rpx;
   border: 2rpx dashed var(--color-border);
   border-radius: var(--radius);
