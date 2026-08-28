@@ -450,10 +450,12 @@ createPage({
 .brand-sub { margin-top: 12rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
 
 /* ========== 账号卡：金属面板（面板质感由全局 .card + .riveted 提供，这里只管布局与叠层） ========== */
+/* 原先 -72rpx 负 margin 是为压住 hero 底部制造悬浮叠层；搜索框上移到
+   hero 与账号卡之间后，负 margin 会把账号卡拉上去盖住搜索框，改为正常间距 */
 .account {
   position: relative; z-index: 2;
   display: flex; align-items: center;
-  margin: -72rpx 8rpx 0; padding: 32rpx 28rpx;
+  margin: 20rpx 8rpx 0; padding: 32rpx 28rpx;
 }
 .avatar-ring {
   width: 104rpx; height: 104rpx; border-radius: 50%; flex-shrink: 0;
