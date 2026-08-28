@@ -18,6 +18,44 @@
       </view>
     </view>
 
+    <!-- 手动搜索：紧跟品牌区置顶，输入设备尾号匹配 -->
+    <view class="search-section anim-item d2" wx:if="{{isLogged}}">
+      <view class="search-box {{searchFocused ? 'focused' : ''}}">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          value="{{searchValue}}"
+          placeholder="输入设备编号尾号搜索"
+          placeholder-class="search-placeholder"
+          bindinput="onSearchInput"
+          bindfocus="onSearchFocus"
+          bindblur="onSearchBlur"
+        />
+        <text class="search-clear" wx:if="{{searchValue}}" bindtap="clearSearch">×</text>
+      </view>
+      <!-- 搜索结果 -->
+      <view class="search-results" wx:if="{{searchResults.length > 0}}">
+        <view
+          class="search-item"
+          wx:for="{{searchResults}}"
+          wx:key="id"
+          style="animation-delay: {{index * 50}}ms"
+          data-sn="{{item.sn}}"
+          bindtap="selectDevice"
+        >
+          <view class="search-item-info">
+            <text class="search-item-sn mono">{{item.sn}}</text>
+            <text class="search-item-name" wx:if="{{item.name}}">{{item.name}}</text>
+          </view>
+          <text class="search-item-community" wx:if="{{item.community}}">{{item.community}}</text>
+          <text class="search-item-arrow">›</text>
+        </view>
+      </view>
+      <view class="search-empty" wx:elif="{{searchValue && !searching && searchResults.length === 0}}">
+        <text class="search-empty-text">未找到匹配设备</text>
+      </view>
+    </view>
+
     <!-- 账号卡：登录后显示身份与角色；未登录给登录入口 -->
     <view class="card account riveted anim-item d2" wx:if="{{isLogged}}">
       <view class="avatar-ring">
@@ -61,49 +99,6 @@
             <view class="scan-line moving"></view>
           </view>
         </view>
-      </view>
-    </view>
-
-    <!-- 手动搜索：扫码失败时的降级方案，输入设备尾号匹配 -->
-    <view class="search-section anim-item d4" wx:if="{{isLogged}}">
-      <view class="search-divider">
-        <text class="divider-line"></text>
-        <text class="divider-text">或手动查找</text>
-        <text class="divider-line"></text>
-      </view>
-      <view class="search-box {{searchFocused ? 'focused' : ''}}">
-        <text class="search-icon">⌕</text>
-        <input
-          class="search-input"
-          value="{{searchValue}}"
-          placeholder="输入设备编号尾号搜索"
-          placeholder-class="search-placeholder"
-          bindinput="onSearchInput"
-          bindfocus="onSearchFocus"
-          bindblur="onSearchBlur"
-        />
-        <text class="search-clear" wx:if="{{searchValue}}" bindtap="clearSearch">×</text>
-      </view>
-      <!-- 搜索结果 -->
-      <view class="search-results" wx:if="{{searchResults.length > 0}}">
-        <view
-          class="search-item"
-          wx:for="{{searchResults}}"
-          wx:key="id"
-          style="animation-delay: {{index * 50}}ms"
-          data-sn="{{item.sn}}"
-          bindtap="selectDevice"
-        >
-          <view class="search-item-info">
-            <text class="search-item-sn mono">{{item.sn}}</text>
-            <text class="search-item-name" wx:if="{{item.name}}">{{item.name}}</text>
-          </view>
-          <text class="search-item-community" wx:if="{{item.community}}">{{item.community}}</text>
-          <text class="search-item-arrow">›</text>
-        </view>
-      </view>
-      <view class="search-empty" wx:elif="{{searchValue && !searching && searchResults.length === 0}}">
-        <text class="search-empty-text">未找到匹配设备</text>
       </view>
     </view>
 
@@ -610,10 +605,8 @@ createPage({
 /* 深色档无需补丁：所有面板/按钮/标签颜色均由语义变量在 .dark 下自动切换 */
 
 /* ========== 搜索区域：内凹金属搜索槽 ========== */
-.search-section { margin-top: 4rpx; }
-.search-divider { display: flex; align-items: center; padding: 32rpx 0 24rpx; }
-.divider-line { flex: 1; height: 1rpx; background: var(--color-border); }
-.divider-text { margin: 0 24rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
+/* 搜索区置于顶部：hero 面板与账号卡之间 */
+.search-section { margin: 20rpx 24rpx 0; }
 /* 搜索槽：内凹金属槽，聚焦时凹槽描边点亮工业橙 */
 .search-box {
   display: flex; align-items: center;
