@@ -589,6 +589,16 @@ createPage({
                 wx.showToast({ title: `${paramDef.label}必须是数字`, icon: 'none' })
                 return
               }
+            } else if (paramDef.type === 'date') {
+              // 黑蚂蚁平台要求日期带时分秒（YYYY-MM-DD HH:mm:ss，见其
+              // setHeatDateApi 示例与 expiredDate 格式），微信日期 picker
+              // 只产出 YYYY-MM-DD，缺时间部分会被平台判格式错误。统一补零点。
+              const v = String(value).trim()
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+                wx.showToast({ title: `${paramDef.label}格式必须为YYYY-MM-DD`, icon: 'none' })
+                return
+              }
+              params[paramDef.key] = `${v} 00:00:00`
             } else if (paramDef.type === 'enum') {
               // 枚举值原样发送：字典里 value 本身已是设备要的类型（工作模式是数字 129~132），
               // 统一 Number() 会把将来出现的字符串枚举压成 NaN。
