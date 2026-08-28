@@ -1240,7 +1240,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 

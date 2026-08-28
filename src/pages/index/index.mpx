@@ -10,12 +10,9 @@
           <text class="brand-sub">正丰智能 · 现场作业平台</text>
         </view>
         <view class="brand-side">
-          <!-- 主题开关收进头图右上角：圆形图标钮，不占单独一行 -->
-          <view class="theme-btn" bindtap="toggleTheme">
-            <text class="theme-btn-icon">{{themeIcon}}</text>
-          </view>
-          <view class="brand-tenant-pill" wx:if="{{isLogged && tenantName}}">
-            <text class="brand-tenant">{{tenantName}}</text>
+          <!-- 设置入口：圆形图标钮（明暗与风格切换移入设置页） -->
+          <view class="theme-btn" bindtap="goSettings">
+            <text class="theme-btn-icon">⚙</text>
           </view>
         </view>
       </view>
@@ -28,10 +25,12 @@
       </view>
       <view class="account-info">
         <text class="account-name">{{displayName}}</text>
+        <!-- 租户名放姓名下方：次要字体、可长可短，超宽省略 -->
+        <text class="account-tenant" wx:if="{{tenantName}}">{{tenantName}}</text>
         <view class="role-tags" wx:if="{{roleLabels.length}}">
           <text class="role-tag tag" wx:for="{{roleLabels}}" wx:key="index">{{item}}</text>
         </view>
-        <text class="account-username" wx:else>@{{username}}</text>
+        <text class="account-username" wx:elif="{{username}}">@{{username}}</text>
       </view>
       <text class="logout" bindtap="handleLogout">退出</text>
     </view>
@@ -180,7 +179,6 @@ createPage({
     canInstall: false,
     canDebug: false,
     themeClass: '',
-    themeIcon: '☀️',
     searchValue: '',
     searchResults: [],
     searching: false,
@@ -217,7 +215,6 @@ createPage({
     const displayName = auth.user.realname || auth.user.username
     this.setData({
       themeClass: store.themeClass,
-      themeIcon: store.themeIcon,
       isLogged: auth.isLogged,
       username: auth.user.username,
       displayName,
@@ -241,10 +238,9 @@ createPage({
     }
   },
 
-  toggleTheme() {
-    const store = useDeviceStore()
-    store.toggleDarkMode()
-    this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
+  // 设置页：明暗主题与界面风格的统一入口（首页不再直接切主题）
+  goSettings() {
+    wx.navigateTo({ url: '/pages/settings/index' })
   },
 
   goLogin() {
@@ -461,16 +457,6 @@ createPage({
 .theme-btn-icon { font-size: 30rpx; line-height: 1; }
 .brand-name { font-size: 48rpx; font-weight: 700; color: var(--color-text); letter-spacing: 2rpx; }
 .brand-sub { margin-top: 12rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
-/* 租户铭牌：小圆角金属牌 */
-.brand-tenant-pill {
-  max-width: 300rpx; margin-top: 16rpx; padding: 8rpx 24rpx; border-radius: var(--radius-sm); flex-shrink: 0;
-  background: var(--color-fill);
-  border: 2rpx solid var(--color-border);
-}
-.brand-tenant {
-  display: block; font-size: 22rpx; color: var(--color-text-secondary); font-weight: 500;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
 
 /* ========== 账号卡：金属面板（面板质感由全局 .card + .riveted 提供，这里只管布局与叠层） ========== */
 .account {
@@ -505,6 +491,13 @@ createPage({
 }
 .account-info { flex: 1; margin-left: 24rpx; overflow: hidden; }
 .account-name { display: block; font-size: 34rpx; font-weight: 600; color: var(--color-text); letter-spacing: 0.5rpx; }
+/* 租户名：次要字体，比姓名低一级；可能更长，超宽单行省略 */
+.account-tenant {
+  display: block; margin-top: 6rpx;
+  font-size: 22rpx; font-weight: 400; letter-spacing: 0.5rpx;
+  color: var(--color-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .account-username {
   display: block; margin-top: 8rpx; font-size: 24rpx; color: var(--color-text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

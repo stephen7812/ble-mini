@@ -50,7 +50,7 @@ createApp({
 page,
 .theme-industrial {
   /* ---- 语义色 ---- */
-  --color-primary: #E8730A;          /* 工业橙 */
+  --color-primary: #0D9488;          /* 工业青绿（浅档点缀色） */
   --color-success: #1F9D55;
   --color-warning: #D6830A;
   --color-danger: #D8392B;
@@ -73,7 +73,7 @@ page,
 
   /* ---- 渐变 ---- */
   --grad-panel: linear-gradient(145deg, #EEF1F5 0%, #D6DBE2 55%, #C6CCD4 100%);
-  --grad-btn-primary: linear-gradient(145deg, #F08A2E 0%, #E8730A 60%, #C96208 100%);
+  --grad-btn-primary: linear-gradient(145deg, #16B8A6 0%, #0D9488 60%, #0B7A70 100%);
   --grad-btn-outline: linear-gradient(145deg, #DFE3E9 0%, #C9CFD7 100%);
 
   /* ---- 装饰 ---- */
@@ -288,7 +288,7 @@ page,
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 .btn-primary:active { opacity: 0.9; transform: scale(0.98) translateY(2rpx); filter: brightness(0.94); }
@@ -451,7 +451,8 @@ page,
     "./pages/control/index",
     "./pages/control-history/index",
     "./pages/device-info/index",
-    "./pages/broadcast/index"
+    "./pages/broadcast/index",
+    "./pages/settings/index"
   ],
   "window": {
     "navigationBarTitleText": "正丰智能阀门",

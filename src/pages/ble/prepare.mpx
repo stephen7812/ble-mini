@@ -367,7 +367,7 @@ createPage({
 }
 .field-wrap.focused {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(232, 115, 10, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
 }
 .field-input {
   height: 88rpx; padding: 0 24rpx; box-sizing: border-box;
@@ -384,7 +384,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
   transition: transform .15s ease, filter .15s ease;
 }
 .scan-btn:active { transform: scale(0.92); filter: brightness(0.94); }
@@ -411,8 +411,8 @@ createPage({
 /* 选中态：橙色描边 + 左侧 LED 光条点亮 + 橙色 12% 底 */
 .sel-active {
   border-color: var(--color-primary);
-  background: rgba(232, 115, 10, 0.12);
-  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), 0 0 12rpx rgba(232, 115, 10, 0.25);
+  background: rgba(13, 148, 136, 0.12);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), 0 0 12rpx rgba(13, 148, 136, 0.25);
 }
 .sel-active::before {
   content: '';
@@ -447,7 +447,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 8rpx 20rpx rgba(232, 115, 10, 0.35);
+    0 8rpx 20rpx rgba(13, 148, 136, 0.35);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform .15s ease, opacity .15s ease, filter .15s ease;
 }

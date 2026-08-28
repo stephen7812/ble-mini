@@ -1299,7 +1299,7 @@ createPage({
   --line-warning: rgba(214, 131, 10, 0.4);
   --tint-danger: rgba(216, 57, 43, 0.12);
   --line-danger: rgba(216, 57, 43, 0.4);
-  --tint-primary: rgba(232, 115, 10, 0.12);
+  --tint-primary: rgba(13, 148, 136, 0.12);
 
   min-height: 100vh;
   padding: 0 0 120rpx 0;
@@ -1428,7 +1428,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 8rpx 20rpx rgba(232, 115, 10, 0.35);
+    0 8rpx 20rpx rgba(13, 148, 136, 0.35);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform .15s ease, filter .15s ease;
 }
@@ -1720,7 +1720,7 @@ createPage({
 }
 .pf-input:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(232, 115, 10, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
 }
 .pf-unit { font-size: 24rpx; color: var(--color-text-tertiary); flex-shrink: 0; width: 40rpx; text-align: center; }
 /* 设定按钮：橙色金属实体键 */
@@ -1733,7 +1733,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 4rpx 12rpx rgba(232, 115, 10, 0.3);
+    0 4rpx 12rpx rgba(13, 148, 136, 0.3);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
 .pf-btn::after { border: none; }
@@ -1782,7 +1782,7 @@ createPage({
 }
 .ps-kpa:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(232, 115, 10, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
 }
 .ps-unit { font-size: 22rpx; color: var(--color-text-tertiary); flex-shrink: 0; }
 .ps-sw { transform: scale(0.68); flex-shrink: 0; }
@@ -1832,7 +1832,7 @@ createPage({
 }
 .ctrl-addr:focus {
   border-color: var(--color-primary);
-  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(232, 115, 10, 0.18);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(13, 148, 136, 0.18);
 }
 .ctrl-addr-flex { flex: 1; width: auto; }
 /* 扫码按钮：橙色金属实体键 */
@@ -1848,7 +1848,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 4rpx 12rpx rgba(232, 115, 10, 0.3);
+    0 4rpx 12rpx rgba(13, 148, 136, 0.3);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform .15s ease, filter .15s ease;
 }

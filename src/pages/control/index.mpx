@@ -1284,7 +1284,7 @@ createPage({
   box-shadow:
     inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
     inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
-    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+    0 6rpx 16rpx rgba(13, 148, 136, 0.35);
   text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
@@ -1507,7 +1507,7 @@ createPage({
 .tp-slot-switch .wx-switch-input.checked {
   background: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 12rpx rgba(232, 115, 10, 0.5) !important;
+  box-shadow: 0 0 12rpx rgba(13, 148, 136, 0.5) !important;
 }
 
 .control-container.dark .tp-main-switch .wx-switch-input.checked,

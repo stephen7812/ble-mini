@@ -1,0 +1,274 @@
+<template>
+  <view class="page {{themeClass}}">
+    <!-- 明暗主题 -->
+    <view class="card riveted section-card">
+      <view class="panel-title">
+        <view class="title-screw"></view>
+        <text class="title-text">明暗主题</text>
+        <text class="title-tag mono">MODE</text>
+      </view>
+      <view class="panel-body">
+        <view class="mode-grid">
+          <view
+            class="mode-option {{themeLevel === 'light' ? 'active' : ''}}"
+            bindtap="applyLevel"
+            data-level="light"
+          >
+            <view class="mode-preview mode-light">
+              <view class="pv-bar"></view>
+              <view class="pv-block"></view>
+              <view class="pv-dot"></view>
+            </view>
+            <text class="mode-name">银灰浅色</text>
+            <view class="mode-led led {{themeLevel === 'light' ? 'on' : ''}}"></view>
+          </view>
+          <view
+            class="mode-option {{themeLevel === 'dark' ? 'active' : ''}}"
+            bindtap="applyLevel"
+            data-level="dark"
+          >
+            <view class="mode-preview mode-dark">
+              <view class="pv-bar"></view>
+              <view class="pv-block"></view>
+              <view class="pv-dot"></view>
+            </view>
+            <text class="mode-name">枪灰暗色</text>
+            <view class="mode-led led {{themeLevel === 'dark' ? 'on' : ''}}"></view>
+          </view>
+          <view
+            class="mode-option {{themeLevel === 'darker' ? 'active' : ''}}"
+            bindtap="applyLevel"
+            data-level="darker"
+          >
+            <view class="mode-preview mode-darker">
+              <view class="pv-bar"></view>
+              <view class="pv-block"></view>
+              <view class="pv-dot"></view>
+            </view>
+            <text class="mode-name">深黑夜间</text>
+            <view class="mode-led led {{themeLevel === 'darker' ? 'on' : ''}}"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 风格选择 -->
+    <view class="card riveted section-card">
+      <view class="panel-title">
+        <view class="title-screw"></view>
+        <text class="title-text">界面风格</text>
+        <text class="title-tag mono">STYLE</text>
+      </view>
+      <view class="panel-body">
+        <view
+          class="style-option active"
+        >
+          <view class="style-info">
+            <view class="style-head">
+              <text class="style-name">工业机械风</text>
+              <view class="led on"></view>
+            </view>
+            <text class="style-desc">拉丝金属面板、铆钉边框、LED 指示灯与数码读数</text>
+          </view>
+          <text class="style-check">✓</text>
+        </view>
+
+        <view class="style-coming">
+          <text class="coming-text">更多风格（苹果风 / HUD 仪表 / 暖通暖色…）规划中，敬请期待</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 关于 -->
+    <view class="card riveted section-card">
+      <view class="panel-title">
+        <view class="title-screw"></view>
+        <text class="title-text">关于</text>
+        <text class="title-tag mono">INFO</text>
+      </view>
+      <view class="panel-body">
+        <view class="about-row">
+          <text class="about-label">应用名称</text>
+          <text class="about-value">正丰智能阀门</text>
+        </view>
+        <view class="about-row">
+          <text class="about-label">当前风格</text>
+          <text class="about-value mono">INDUSTRIAL</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { useDeviceStore } from '../../stores/device'
+
+createPage({
+  data: {
+    themeClass: '',
+    themeLevel: 'light',
+  },
+
+  onShow() {
+    const store = useDeviceStore()
+    this.setData({
+      themeClass: store.themeClass,
+      themeLevel: store.themeLevel,
+    })
+  },
+
+  methods: {
+    // 明暗档选择：点击即应用并持久化，全 app 生效
+    applyLevel(e) {
+      const level = e.currentTarget.dataset.level
+      const store = useDeviceStore()
+      if (level === store.themeLevel) return
+      store.setThemeLevel(level)
+      this.setData({
+        themeClass: store.themeClass,
+        themeLevel: store.themeLevel,
+      })
+      const names = { light: '银灰浅色', dark: '枪灰暗色', darker: '深黑夜间' }
+      wx.showToast({ title: `已切换：${names[level]}`, icon: 'none' })
+    },
+  },
+})
+</script>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  padding: 24rpx 0 56rpx;
+  box-sizing: border-box;
+}
+
+/* ========== 面板标题：螺丝 + 文本 + 英文铭牌 ========== */
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 28rpx;
+  margin: -32rpx -32rpx 24rpx;
+  border-bottom: 2rpx var(--panel-border-style) var(--color-border);
+  background: linear-gradient(180deg, var(--color-panel-2) 0%, var(--color-panel-3) 100%);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.title-screw {
+  width: 16rpx; height: 16rpx; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--deco-rivet), var(--deco-rivet-shadow) 75%);
+  box-shadow: inset 0 0 2rpx rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
+}
+.title-text { font-size: 30rpx; font-weight: 700; letter-spacing: 2rpx; color: var(--color-text); }
+.title-tag {
+  margin-left: auto;
+  font-size: 18rpx; letter-spacing: 3rpx;
+  color: var(--color-text-tertiary);
+  padding: 4rpx 14rpx;
+  border: 1rpx solid var(--color-border);
+  border-radius: 6rpx;
+  background: var(--color-panel-2);
+}
+
+/* ========== 明暗档三选一 ========== */
+.mode-grid { display: flex; gap: 20rpx; }
+.mode-option {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 12rpx 20rpx;
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-panel-2);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.mode-option:active { filter: brightness(0.96); }
+.mode-option.active {
+  border-color: var(--color-primary);
+  background: var(--color-fill);
+}
+.mode-name { font-size: 24rpx; color: var(--color-text); font-weight: 600; }
+.mode-led { margin-top: -6rpx; }
+
+/* 缩略预览：小面板模拟各档观感 */
+.mode-preview {
+  width: 100%; height: 120rpx;
+  border-radius: var(--radius-sm);
+  border: 2rpx solid var(--color-border);
+  display: flex; flex-direction: column;
+  gap: 10rpx; padding: 14rpx; box-sizing: border-box;
+  overflow: hidden;
+}
+.pv-bar { height: 12rpx; border-radius: 4rpx; width: 70%; }
+.pv-block { flex: 1; border-radius: 6rpx; width: 100%; }
+.pv-dot { width: 14rpx; height: 14rpx; border-radius: 50%; }
+/* 浅档预览 */
+.mode-light { background: #E6E9EE; }
+.mode-light .pv-bar { background: #9BA1AB; }
+.mode-light .pv-block { background: #F3F5F8; border: 1rpx solid #C6CCD4; }
+.mode-light .pv-dot { background: #0D9488; box-shadow: 0 0 8rpx rgba(13, 148, 136, 0.6); }
+/* 枪灰预览 */
+.mode-dark { background: #2A2D34; }
+.mode-dark .pv-bar { background: #565A64; }
+.mode-dark .pv-block { background: #2E323A; border: 1rpx solid #3A3E47; }
+.mode-dark .pv-dot { background: #FF8A1E; box-shadow: 0 0 8rpx rgba(255, 138, 30, 0.6); }
+/* 深黑预览 */
+.mode-darker { background: #16181C; }
+.mode-darker .pv-bar { background: #33373E; }
+.mode-darker .pv-block { background: #1C1E23; border: 1rpx solid #2A2D33; }
+.mode-darker .pv-dot { background: #FF8A1E; box-shadow: 0 0 8rpx rgba(255, 138, 30, 0.55); }
+
+/* ========== 风格选择 ========== */
+.style-option {
+  display: flex; align-items: center; gap: 20rpx;
+  padding: 26rpx 26rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-fill);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
+}
+.style-info { flex: 1; overflow: hidden; }
+.style-head { display: flex; align-items: center; gap: 14rpx; }
+.style-name { font-size: 30rpx; font-weight: 700; color: var(--color-text); letter-spacing: 1rpx; }
+.style-desc {
+  display: block; margin-top: 10rpx;
+  font-size: 22rpx; line-height: 1.5; color: var(--color-text-secondary);
+}
+.style-check {
+  width: 48rpx; height: 48rpx; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  color: #fff; font-size: 28rpx; font-weight: 700;
+  background: var(--grad-btn-primary);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35);
+}
+
+/* 后续风格占位 */
+.style-coming {
+  margin-top: 20rpx;
+  padding: 24rpx;
+  border: 2rpx dashed var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-panel-2);
+}
+.coming-text { font-size: 22rpx; color: var(--color-text-tertiary); line-height: 1.6; }
+
+/* ========== 关于 ========== */
+.about-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid var(--color-border);
+}
+.about-row:last-child { border-bottom: none; }
+.about-label { font-size: 26rpx; color: var(--color-text-secondary); }
+.about-value { font-size: 26rpx; color: var(--color-text); font-weight: 600; }
+</style>
+
+<script type="application/json">
+{
+  "navigationBarTitleText": "设置"
+}
+</script>
