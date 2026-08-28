@@ -608,7 +608,8 @@ createPage({
 
 /* ========== 搜索区域：内凹金属搜索槽 ========== */
 /* 搜索区置于顶部：hero 面板与账号卡之间 */
-.search-section { margin: 20rpx 24rpx 0; }
+/* 与账号卡同宽：两边留白对齐 8rpx（账号卡 margin 8rpx + 卡内 padding 由 .card 统一） */
+.search-section { margin: 20rpx 32rpx 0; }
 /* 搜索槽：内凹金属槽，聚焦时凹槽描边点亮工业橙 */
 .search-box {
   display: flex; align-items: center;
