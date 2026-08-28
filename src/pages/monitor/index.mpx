@@ -172,13 +172,13 @@
                   {{ realtimeData.data.battery != null ? realtimeData.data.battery : '-' }}
                 </text>
                 <text class="info-unit" wx:if="{{ realtimeData.data.battery != null }}">%</text>
-                <view class="led-meter {{getBatteryClass(realtimeData.data.battery)}}">
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                </view>
+              </view>
+              <view class="led-meter {{getBatteryClass(realtimeData.data.battery)}}">
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
               </view>
             </view>
 
@@ -189,13 +189,13 @@
                   {{ realtimeData.data.signal_strength != null ? realtimeData.data.signal_strength : '-' }}
                 </text>
                 <text class="info-unit" wx:if="{{ realtimeData.data.signal_strength != null }}">dBm</text>
-                <view class="led-meter {{getSignalClass(realtimeData.data.signal_strength)}}">
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                  <view class="seg"></view>
-                </view>
+              </view>
+              <view class="led-meter {{getSignalClass(realtimeData.data.signal_strength)}}">
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
+                <view class="seg"></view>
               </view>
             </view>
 
@@ -947,16 +947,18 @@ createPage({
   font-weight: 500;
 }
 
+/* 数值行：数字 + 单位基线对齐；电平表独立成行不再挤同一行 */
 .info-value-row {
   display: flex;
   align-items: baseline;
-  gap: 8rpx;
+  gap: 6rpx;
 }
 
 /* 数码读数（字体由全局 .mono 提供） */
 .info-value {
   font-size: 36rpx;
   font-weight: 700;
+  line-height: 1.2;
   color: var(--color-text);
 }
 
@@ -965,13 +967,12 @@ createPage({
   color: var(--color-text-tertiary);
 }
 
-/* ---------- LED 段式电平表（电量/信号） ---------- */
+/* ---------- LED 段式电平表（电量/信号）：独占一行，右对齐 ---------- */
 .led-meter {
   display: flex;
   align-items: center;
   gap: 5rpx;
   margin-left: auto;
-  align-self: center;
   padding: 5rpx 7rpx;
   border-radius: 6rpx;
   background: var(--color-input-inset);
