@@ -203,6 +203,7 @@ createPage({
 <style lang="stylus">
 .history-page
   min-height 100vh
+  padding-bottom calc(40rpx + env(safe-area-inset-bottom))
 
 /* ==================== 页面头部：拉丝金属铭牌横条 ==================== */
 .page-header

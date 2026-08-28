@@ -335,7 +335,8 @@ createPage({
 </script>
 
 <style scoped>
-.page { padding: 24rpx 24rpx 48rpx; min-height: 100vh; box-sizing: border-box; }
+/* 底部余量加安全区：全面屏机型 home 条不遮保存按钮 */
+.page { padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom)); min-height: 100vh; box-sizing: border-box; }
 
 .card { margin: 0 0 24rpx; padding: 28rpx 28rpx 16rpx; }
 

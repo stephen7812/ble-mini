@@ -266,7 +266,8 @@ createPage({
 </script>
 
 <style scoped>
-.page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx 220rpx; }
+/* 底部预留 = 双排按钮操作栏（约 300rpx）+ 安全区，否则最后一段内容被 fixed 栏盖住 */
+.page { min-height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx calc(360rpx + env(safe-area-inset-bottom)); }
 
 /* ========== 入场动画 ========== */
 .anim-item { opacity: 0; animation: fadeUp .5s cubic-bezier(.22, .9, .32, 1) forwards; }

@@ -532,7 +532,8 @@ createPage({
   min-height: 100vh;
   background-color: var(--color-bg);
   background-image: var(--bg-texture);
-  padding-bottom: 150rpx;
+  /* 底部预留 = fixed 操作栏（约 160rpx）+ 安全区 + 呼吸余量 */
+  padding-bottom: calc(240rpx + env(safe-area-inset-bottom));
 }
 
 /* ==================== 动画定义 ==================== */

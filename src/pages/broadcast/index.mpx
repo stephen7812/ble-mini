@@ -1295,7 +1295,8 @@ createPage({
    随风格（工业、能源、蓝图）与明暗档自动切换，此处不再局部覆写。 */
 .app {
   min-height: 100vh;
-  padding: 0 0 120rpx 0;
+  /* 底部预留 = fixed tabbar（100rpx + 安全区）+ 呼吸余量 */
+  padding: 0 0 calc(220rpx + env(safe-area-inset-bottom)) 0;
 }
 
 /* ======================= SHARED ========================== */

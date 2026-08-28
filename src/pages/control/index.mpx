@@ -785,7 +785,8 @@ createPage({
    明档随 page 主题、暗档随根节点 .dark class 自动切换，局部暗档补丁见文末。 */
 .control-container {
   min-height: 100vh;
-  padding-bottom: 40rpx;
+  /* 底部余量含安全区：全面屏 home 条不遮最后一个命令卡 */
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
   /* 底色与拉丝金属纹理由 page 层主题（app.mpx）提供 */
 }
 
