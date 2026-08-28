@@ -947,10 +947,12 @@ createPage({
   font-weight: 500;
 }
 
-/* 数值行：数字 + 单位基线对齐；电平表独立成行不再挤同一行 */
+/* 数值行：底部对齐 + 单位下移修正基线。
+   微信 text 组件对 align-items:baseline 支持不稳（无内联基线上下文），
+   改用 flex-end + 单位 padding-bottom 手动对齐数字基线 */
 .info-value-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   gap: 6rpx;
 }
 
@@ -964,6 +966,9 @@ createPage({
 
 .info-unit {
   font-size: 22rpx;
+  line-height: 1.2;
+  /* 36rpx 数码字基线 ≈ 底部上方 8rpx，单位同高对齐到该基线 */
+  padding-bottom: 7rpx;
   color: var(--color-text-tertiary);
 }
 
