@@ -1,69 +1,185 @@
 <template>
-  <view class="control-page">
-    <!-- 设备信息头部 -->
-    <view class="device-header">
-      <view class="device-title">
-        <text class="device-name">{{ deviceName }}</text>
-        <text class="device-sn">SN: {{ deviceSn }}</text>
+  <view class="control-container {{darkMode ? 'dark' : ''}}">
+    <!-- Hero 头部：设备信息与快捷入口 -->
+    <view class="hero-section anim-fade-in">
+      <view class="hero-deco deco-1"></view>
+      <view class="hero-deco deco-2"></view>
+
+      <view class="hero-content">
+        <view class="device-header">
+          <view class="device-info">
+            <text class="device-name">{{ deviceName }}</text>
+            <text class="device-sn">SN: {{ deviceSn }}</text>
+            <view class="device-meta" wx:if="{{ platformName }}">
+              <text class="platform-badge">{{ platformName }}</text>
+            </view>
+          </view>
+          <view class="header-actions">
+            <view class="theme-switch" bindtap="toggleTheme">
+              <text class="theme-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+            </view>
+            <view class="history-btn" bindtap="goHistory">
+              <text class="history-icon">⧉</text>
+            </view>
+          </view>
+        </view>
       </view>
-      <!-- 历史记录图标 -->
-      <view class="history-icon" bindtap="goHistory">
-        <text class="icon-text">📋</text>
+    </view>
+
+    <!-- 主内容区 -->
+    <view class="content-wrapper">
+      <!-- 加载状态 -->
+      <view class="loading-state anim-fade-in" wx:if="{{ loadingCommands }}">
+        <view class="loading-spinner"></view>
+        <text class="loading-text">正在加载控制功能...</text>
       </view>
-    </view>
 
-    <!-- 加载状态 -->
-    <view class="loading-section" wx:if="{{ loadingCommands }}">
-      <view class="loading-spinner"></view>
-      <text class="loading-text">正在加载控制功能...</text>
-    </view>
+      <!-- 暂无可用控制功能 -->
+      <view class="empty-state anim-fade-in" wx:if="{{ !loadingCommands && availableCommands.length === 0 }}">
+        <view class="empty-icon">
+          <view class="empty-wave wave-1"></view>
+          <view class="empty-wave wave-2"></view>
+          <view class="empty-dot"></view>
+        </view>
+        <text class="empty-title">暂无可用控制功能</text>
+        <text class="empty-hint">该设备暂不支持远程控制，或网络连接异常</text>
+      </view>
 
-    <!-- 暂无可用控制功能 -->
-    <view class="empty-section" wx:if="{{ !loadingCommands && availableCommands.length === 0 }}">
-      <text class="empty-icon">⚠️</text>
-      <text class="empty-title">暂无可用控制功能</text>
-      <text class="empty-hint">该设备暂不支持远程控制，或网络连接异常</text>
-    </view>
-
-    <!-- 动态控制卡片 -->
-    <view class="control-section" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
-      <view class="section-title">远程控制</view>
-
-      <!-- 动态渲染每个命令 -->
-      <view class="control-card" wx:for="{{ availableCommands }}" wx:key="command">
-        <view class="card-header">
-          <text class="card-title">{{ item.name }}</text>
-          <text class="card-desc" wx:if="{{ item.description }}">{{ item.description }}</text>
+      <!-- 控制命令列表 -->
+      <view class="control-list anim-slide-up d1" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
+        <view class="section-header">
+          <view class="header-accent"></view>
+          <text class="section-title">远程控制</text>
         </view>
 
-        <view class="card-body">
-          <!-- 动态渲染参数输入 -->
-          <view class="input-row" wx:for="{{ item.params }}" wx:for-item="param" wx:key="key">
-            <text class="input-label">{{ param.label }}</text>
-            <input
-              class="input-field"
-              type="{{ param.type === 'number' ? 'digit' : 'text' }}"
-              data-command="{{ item.command }}"
-              data-param="{{ param.key }}"
-              value="{{ getParamValue(item.command, param.key) }}"
-              placeholder="{{ param.default }}"
-              bindinput="handleParamInput"
-            />
+        <!-- 动态渲染每个命令卡片：参考蓝牙控制页 pf-field 卡片风格 -->
+        <view class="command-card" wx:for="{{ availableCommands }}" wx:for-item="cmdItem" wx:key="command">
+          <text class="command-title">{{ cmdItem.name }}</text>
+          <text class="command-desc" wx:if="{{ cmdItem.description }}">{{ cmdItem.description }}</text>
+
+          <!--
+            动态渲染参数输入：value 直接读 param.value，不调用 method。
+            Mpx 从渲染函数里调方法时 this 未绑定实例，method 内访问 this.data
+            会抛 "Cannot read properties of undefined (reading 'data')".
+          -->
+
+          <!-- 分时压力：独立 UI（总开关 + 5 个时段） -->
+          <block wx:if="{{ cmdItem.command === 'setTimePressure' }}">
+            <view class="tp-main-row">
+              <text class="tp-main-label">分时压力总开关</text>
+              <switch class="tp-main-switch" checked="{{ timePressure.enable }}" data-command="{{ cmdItem.command }}" bindchange="onTimePressureEnableToggle" />
+            </view>
+
+            <view class="tp-slots">
+              <view class="tp-slot {{ !timePressure.enable ? 'tp-disabled' : '' }}" wx:for="{{ timePressure.slots }}" wx:for-item="slot" wx:key="id">
+                <view class="tp-slot-head">
+                  <text class="tp-slot-title">时段{{ slot.id }}</text>
+                  <switch class="tp-slot-switch" checked="{{ slot.on }}" data-idx="{{ index }}" data-command="{{ cmdItem.command }}" bindchange="onTimePressureSlotToggle" />
+                </view>
+                <view class="tp-slot-body">
+                  <picker
+                    class="tp-time-picker"
+                    mode="time"
+                    value="{{ slot.time }}"
+                    data-idx="{{ index }}"
+                    data-command="{{ cmdItem.command }}"
+                    bindchange="onTimePressureTime"
+                    disabled="{{ !slot.on || !timePressure.enable }}"
+                  >
+                    <view class="tp-time-val {{ !slot.on || !timePressure.enable ? 'tp-off' : '' }}">{{ slot.time }}</view>
+                  </picker>
+                  <view class="tp-pressure-wrap">
+                    <input
+                      class="tp-pressure-input"
+                      type="digit"
+                      value="{{ slot.pressure }}"
+                      data-idx="{{ index }}"
+                      data-command="{{ cmdItem.command }}"
+                      bindinput="onTimePressurePressure"
+                      disabled="{{ !slot.on || !timePressure.enable }}"
+                      placeholder="压力"
+                    />
+                    <text class="tp-pressure-unit">MPa</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </block>
+
+          <!-- 普通参数 -->
+          <block wx:else>
+            <view class="param-row" wx:for="{{ cmdItem.params }}" wx:for-item="param" wx:key="key">
+              <text class="param-label">{{ param.label }}</text>
+              <view class="param-input-wrap">
+                <!-- 枚举参数走 picker：候选值由后端字典给出或由前端补充 -->
+                <picker
+                  wx:if="{{ param.widgetType === 'enum' }}"
+                  class="param-input param-picker"
+                  style="width: 100%;"
+                  mode="selector"
+                  range="{{ param.options }}"
+                  range-key="label"
+                  value="{{ param.optionIndex }}"
+                  data-command="{{ cmdItem.command }}"
+                  data-param="{{ param.key }}"
+                  bindchange="handleParamPick"
+                >
+                  <view class="picker-display">
+                    <text class="picker-value">{{ param.optionLabel }}</text>
+                    <text class="picker-arrow">⌄</text>
+                  </view>
+                </picker>
+
+                <!-- 日期参数走日期选择器 -->
+                <picker
+                  wx:elif="{{ param.widgetType === 'date' }}"
+                  class="param-input param-picker"
+                  style="width: 100%;"
+                  mode="date"
+                  value="{{ param.value }}"
+                  data-command="{{ cmdItem.command }}"
+                  data-param="{{ param.key }}"
+                  bindchange="handleParamDatePick"
+                >
+                  <view class="picker-display">
+                    <text class="picker-value">{{ param.value }}</text>
+                    <text class="picker-arrow">⌄</text>
+                  </view>
+                </picker>
+
+                <!-- 普通输入 -->
+                <input
+                  wx:else
+                  class="param-input"
+                  type="{{ param.widgetType === 'number' ? 'digit' : 'text' }}"
+                  data-command="{{ cmdItem.command }}"
+                  data-param="{{ param.key }}"
+                  value="{{ param.value }}"
+                  placeholder="{{ param.default }}"
+                  bindinput="handleParamInput"
+                />
+
+                <text class="param-unit" wx:if="{{ param.unit }}">{{ param.unit }}</text>
+              </view>
+            </view>
+
+            <!-- 枚举项的行为说明：只显示当前选中项 -->
+            <view class="param-hint" wx:for="{{ cmdItem.params }}" wx:for-item="param" wx:key="key" wx:if="{{ param.widgetType === 'enum' && param.optionDesc }}">
+              <text class="param-hint-text">{{ param.optionDesc }}</text>
+            </view>
+          </block>
+
+          <view class="command-actions">
+            <button class="btn-set" data-command="{{ cmdItem.command }}" bindtap="handleSendCommand">设定</button>
           </view>
         </view>
 
-        <view class="card-actions">
-          <button class="btn-confirm" data-command="{{ item.command }}" bindtap="handleSendCommand">
-            确认执行
-          </button>
+        <!-- 底部安全提示 -->
+        <view class="safety-banner anim-slide-up d2">
+          <view class="safety-icon">!</view>
+          <text class="safety-text">远程控制将直接作用于设备，请谨慎操作</text>
         </view>
       </view>
-    </view>
-
-    <!-- 底部安全提示 -->
-    <view class="safety-notice" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
-      <text class="notice-icon">⚠️</text>
-      <text class="notice-text">远程控制将直接作用于设备，请谨慎操作</text>
     </view>
   </view>
 </template>
@@ -71,13 +187,17 @@
 <script>
 import { createPage } from '@mpxjs/core'
 import { sendControlCommand, getDeviceCommands, getDeviceBySn } from '../../services/api/tenant'
+import { useDeviceStore } from '../../stores/device'
 
 createPage({
   data: {
     deviceSn: '',
     deviceId: null,
     deviceName: '',
-    valveType: '', // 阀门类型：pilot=先导阀，flow=流量阀等
+    // 产品类别：flow_control=流量调节阀，pilot_reducing=先导减压阀
+    productCategory: '',
+    // 设备阀控类型（遗留字段，仅作 productCategory 缺失时的兜底）
+    valveType: '',
     // 平台信息
     platformName: '',
     platformKind: '',
@@ -85,7 +205,20 @@ createPage({
     availableCommands: [],
     loadingCommands: true,
     // 参数值存储 { command: { paramKey: value } }
-    paramValues: {}
+    paramValues: {},
+    // 分时压力设置（总开关 + 5 个时段）
+    timePressure: {
+      enable: false,
+      slots: [
+        { id: 1, on: false, time: '00:00', pressure: '' },
+        { id: 2, on: false, time: '00:00', pressure: '' },
+        { id: 3, on: false, time: '00:00', pressure: '' },
+        { id: 4, on: false, time: '00:00', pressure: '' },
+        { id: 5, on: false, time: '00:00', pressure: '' }
+      ]
+    },
+    // 深色模式
+    darkMode: false
   },
 
   onLoad(options) {
@@ -106,6 +239,12 @@ createPage({
     this.loadDeviceInfo()
   },
 
+  onShow() {
+    // 恢复深色模式状态，保持与实时监控页一致
+    const store = useDeviceStore()
+    this.setData({ darkMode: store.darkMode })
+  },
+
   methods: {
     // 加载设备完整信息（包含平台、产品等信息）
     async loadDeviceInfo() {
@@ -115,19 +254,21 @@ createPage({
         // 保存设备信息，用于后续判断平台类型
         this.deviceInfo = device
 
-        // 更新设备名称和阀门类型
-        // 注意：如果 valve_type 为 null/undefined，需要从其他字段推断或默认处理
-        const valveType = device.valve_type || ''
+        // 产品类别以 product_category 为准（flow_control / pilot_reducing）。
+        // 不用 device.valve_type：那是遗留字段，存量数据连流量阀也是默认值 "pilot"，
+        // 用它判断会把流量阀当先导阀，误过滤掉设置开度等命令。
+        const productCategory = device.product_category || ''
 
         this.setData({
           deviceName: device.name || this.data.deviceSn,
-          valveType: valveType
+          productCategory: productCategory,
+          valveType: device.valve_type || ''
         })
 
         console.log('设备信息:', {
           name: device.name,
+          product_category: device.product_category,
           valve_type: device.valve_type,
-          valveType: valveType,
           sn: device.sn,
           device_model: device.device_model
         })
@@ -167,36 +308,75 @@ createPage({
         const platformName = platformKind === 'black-ant' ? '黑蚂蚁' : (platformKind === 'huawei-iotda' ? '华为IoTDA' : platformKind)
         let commands = result.capability && result.capability.commands ? result.capability.commands : []
 
-        console.log('过滤前的指令列表:', commands)
-        console.log('当前阀门类型:', this.data.valveType)
+        console.log('后端返回的指令列表:', commands)
+        console.log('当前产品类别:', this.data.productCategory)
+        console.log('当前阀控类型:', this.data.valveType)
 
-        // 根据阀门类型过滤命令：先导阀不能设置开度和圈数
-        if (this.data.valveType === 'pilot') {
+        // 按设备类型过滤命令。优先使用 product_category，缺失时用 valve_type 兜底：
+        // - flow / flow_control：流量调节阀，支持开度、周期、供暖日期、工作模式、回水温度、室温
+        // - pilot / pilot_reducing：先导减压阀，支持周期、供暖日期、目标压力、分时压力
+        const category = this.resolveDeviceCategory()
+        if (category) {
+          const allowed = this.getCommandsByCategory(category)
           const originalLength = commands.length
-          commands = commands.filter(cmd => {
-            const command = cmd.command.toLowerCase()
-            const shouldKeep = !command.includes('open') && !command.includes('position')
-            console.log(`命令 ${cmd.command}: ${shouldKeep ? '保留' : '过滤'}`)
-            return shouldKeep
-          })
-          console.log(`先导阀过滤: ${originalLength} -> ${commands.length} 条命令`)
+          commands = commands.filter(cmd => allowed.indexOf(cmd.command) !== -1)
+          console.log(`${category} 过滤: ${originalLength} -> ${commands.length} 条命令`)
+
+          // 先导阀：把压力设置相关命令固定排在最前面
+          if (category === 'pilot_reducing') {
+            commands = this.sortPilotCommands(commands)
+          }
+        } else {
+          console.warn('无法识别设备类别，显示后端返回的全部命令')
         }
 
-        console.log('过滤后的指令列表:', commands)
-
-        // 初始化参数默认值
+        // 初始化参数默认值：value 直接内联到每个 param 上供模板读取，
+        // 同时保留 paramValues 映射供下发指令时取值。
         const paramValues = {}
-        commands.forEach(cmd => {
+        const normalizedCommands = commands.map(cmd => {
           paramValues[cmd.command] = {}
-          if (cmd.params && Array.isArray(cmd.params)) {
-            cmd.params.forEach(param => {
-              paramValues[cmd.command][param.key] = param.default || ''
-            })
-          }
+          const params = Array.isArray(cmd.params) ? cmd.params : []
+          const nextParams = params.map(param => {
+            // 根据命令类型规范化参数控件与单位：
+            // - 工作模式强制走枚举选择器
+            // - 周期参数单位统一为「分」
+            // - 供暖日期强制走日期选择器
+            const normalized = this.normalizeParam(cmd.command, param)
+            const initial = normalized.default === undefined || normalized.default === null ? '' : String(normalized.default)
+
+            // 枚举参数额外算三个展示字段：picker 只认下标，而下发要的是 options 里的 value。
+            // 这里把「下标 / 选中项文案 / 选中项说明」一起内联到 param 上，
+            // 因为 Mpx 模板里不能调 method 去现算（this 未绑定实例）。
+            if (normalized.widgetType === 'enum' && Array.isArray(normalized.options) && normalized.options.length) {
+              // 找不到与 default 相符的选项时落到第 0 项：宁可预选一个合法值，
+              // 也不要让 picker 停在 -1（界面空白，用户不点就发出一个空 mode）。
+              const idx = Math.max(0, normalized.options.findIndex(opt => opt.value === normalized.default))
+              const picked = normalized.options[idx]
+              paramValues[cmd.command][normalized.key] = picked.value
+              return {
+                ...normalized,
+                value: picked.value,
+                optionIndex: idx,
+                optionLabel: picked.label,
+                optionDesc: picked.description || ''
+              }
+            }
+
+            // 日期参数：未给默认值时默认今天
+            if (normalized.widgetType === 'date') {
+              const dateValue = initial || this.formatDate(new Date())
+              paramValues[cmd.command][normalized.key] = dateValue
+              return { ...normalized, value: dateValue }
+            }
+
+            paramValues[cmd.command][normalized.key] = initial
+            return { ...normalized, value: initial }
+          })
+          return { ...cmd, params: nextParams }
         })
 
         this.setData({
-          availableCommands: commands,
+          availableCommands: normalizedCommands,
           platformName: platformName,
           platformKind: platformKind,
           paramValues: paramValues,
@@ -218,22 +398,118 @@ createPage({
       }
     },
 
-    // 获取参数值
-    getParamValue(command, paramKey) {
-      if (!this.data.paramValues || !this.data.paramValues[command]) {
-        return ''
-      }
-      return this.data.paramValues[command][paramKey] || ''
-    },
-
-    // 参数输入
+    // 参数输入：同时回写 paramValues（下发时取值）和 availableCommands 里的 value（模板显示）
     handleParamInput(e) {
       const { command, param } = e.currentTarget.dataset
       const value = e.detail.value
 
+      const cmdIndex = this.data.availableCommands.findIndex(item => item.command === command)
+      if (cmdIndex === -1) return
+      const paramIndex = (this.data.availableCommands[cmdIndex].params || []).findIndex(item => item.key === param)
+      if (paramIndex === -1) return
+
       this.setData({
-        [`paramValues.${command}.${param}`]: value
+        [`paramValues.${command}.${param}`]: value,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].value`]: value
       })
+    },
+
+    // 枚举参数选择：picker 的 e.detail.value 是**下标**，不是候选值本身，
+    // 必须换算成 options[idx].value 再回写 paramValues，否则下发的 mode 会是 0~3。
+    handleParamPick(e) {
+      const { command, param } = e.currentTarget.dataset
+      const idx = Number(e.detail.value)
+
+      const cmdIndex = this.data.availableCommands.findIndex(item => item.command === command)
+      if (cmdIndex === -1) return
+      const params = this.data.availableCommands[cmdIndex].params || []
+      const paramIndex = params.findIndex(item => item.key === param)
+      if (paramIndex === -1) return
+
+      const picked = (params[paramIndex].options || [])[idx]
+      if (!picked) return
+
+      this.setData({
+        [`paramValues.${command}.${param}`]: picked.value,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].value`]: picked.value,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].optionIndex`]: idx,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].optionLabel`]: picked.label,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].optionDesc`]: picked.description || ''
+      })
+    },
+
+    // 日期参数选择
+    handleParamDatePick(e) {
+      const { command, param } = e.currentTarget.dataset
+      const value = e.detail.value
+
+      const cmdIndex = this.data.availableCommands.findIndex(item => item.command === command)
+      if (cmdIndex === -1) return
+      const params = this.data.availableCommands[cmdIndex].params || []
+      const paramIndex = params.findIndex(item => item.key === param)
+      if (paramIndex === -1) return
+
+      this.setData({
+        [`paramValues.${command}.${param}`]: value,
+        [`availableCommands[${cmdIndex}].params[${paramIndex}].value`]: value
+      })
+    },
+
+    // ========== 分时压力 ==========
+
+    // 总开关切换：关闭时同时关闭所有时段开关，开启时不改变子开关状态
+    onTimePressureEnableToggle(e) {
+      const enable = !!e.detail.value
+      const patch = { 'timePressure.enable': enable }
+      if (!enable) {
+        for (let i = 0; i < 5; i++) {
+          patch[`timePressure.slots[${i}].on`] = false
+        }
+      }
+      this.setData(patch)
+    },
+
+    // 单个时段开关切换：任一子开关开启则总开关自动开启；全部关闭则总开关自动关闭
+    onTimePressureSlotToggle(e) {
+      const idx = Number(e.currentTarget.dataset.idx)
+      const on = !!e.detail.value
+      const patch = { [`timePressure.slots[${idx}].on`]: on }
+      if (on) {
+        patch['timePressure.enable'] = true
+      } else {
+        const anyOn = this.data.timePressure.slots.some((s, i) => i !== idx && s.on)
+        if (!anyOn) patch['timePressure.enable'] = false
+      }
+      this.setData(patch)
+    },
+
+    // 时段时间选择
+    onTimePressureTime(e) {
+      const idx = Number(e.currentTarget.dataset.idx)
+      this.setData({ [`timePressure.slots[${idx}].time`]: e.detail.value })
+    },
+
+    // 时段压力输入
+    onTimePressurePressure(e) {
+      const idx = Number(e.currentTarget.dataset.idx)
+      this.setData({ [`timePressure.slots[${idx}].pressure`]: e.detail.value })
+    },
+
+    // 把 timePressure 对象转换为后端下发的参数对象。
+    // 格式与租户端一致：{ enabled, en1..5, time1..5, ps1..5 }，ps 单位为 MPa，
+    // 后端接口负责将 MPa 转换为 KPa 再传给黑蚂蚁平台。
+    buildTimePressureParams() {
+      const { enable, slots } = this.data.timePressure
+      const params = { enabled: enable ? 1 : 0 }
+      for (let i = 0; i < 5; i++) {
+        const s = slots[i]
+        params[`en${i + 1}`] = s.on ? 1 : 0
+        if (s.on) {
+          params[`time${i + 1}`] = s.time
+          params[`ps${i + 1}`] = Number(s.pressure)
+        }
+      }
+      return params
     },
 
     // 发送控制指令
@@ -247,29 +523,71 @@ createPage({
         return
       }
 
-      // 获取参数值
-      const params = {}
-      const commandValues = this.data.paramValues[commandName] || {}
+      let params = {}
 
-      if (commandConfig.params && Array.isArray(commandConfig.params)) {
-        for (const paramDef of commandConfig.params) {
-          const value = commandValues[paramDef.key]
+      // 分时压力：使用独立的 timePressure 数据构造参数
+      if (commandName === 'setTimePressure') {
+        const { enable, slots } = this.data.timePressure
+        const active = []
 
-          // 参数验证
-          if (value === '' || value === undefined) {
-            wx.showToast({ title: `请输入${paramDef.label}`, icon: 'none' })
+        for (let i = 0; i < 5; i++) {
+          const s = slots[i]
+          if (!s.on) continue
+          if (!s.time) {
+            wx.showToast({ title: `时段${i + 1} 未选择时间`, icon: 'none' })
             return
           }
+          const v = Number(s.pressure) || 0
+          // 前端输入单位为 MPa，与后端校验范围一致（0~2.5 MPa）
+          if (v <= 0 || v > 2.5) {
+            wx.showToast({ title: `时段${i + 1} 压力需在 0~2.5 MPa 之间`, icon: 'none' })
+            return
+          }
+          const [h, m] = String(s.time).split(':').map(Number)
+          active.push({ idx: i, min: h * 60 + m })
+        }
 
-          // 类型转换
-          if (paramDef.type === 'number') {
-            params[paramDef.key] = Number(value)
-            if (isNaN(params[paramDef.key])) {
-              wx.showToast({ title: `${paramDef.label}必须是数字`, icon: 'none' })
+        if (enable && !active.length) {
+          wx.showToast({ title: '请至少启用一个时段', icon: 'none' })
+          return
+        }
+
+        for (let k = 1; k < active.length; k++) {
+          if (active[k].min <= active[k - 1].min) {
+            wx.showToast({ title: '时段时间需按先后递增', icon: 'none' })
+            return
+          }
+        }
+
+        params = this.buildTimePressureParams()
+      } else {
+        // 普通参数：从 paramValues 取值并校验
+        const commandValues = this.data.paramValues[commandName] || {}
+
+        if (commandConfig.params && Array.isArray(commandConfig.params)) {
+          for (const paramDef of commandConfig.params) {
+            const value = commandValues[paramDef.key]
+
+            // 参数验证
+            if (value === '' || value === undefined) {
+              wx.showToast({ title: `请输入${paramDef.label}`, icon: 'none' })
               return
             }
-          } else {
-            params[paramDef.key] = value
+
+            // 类型转换
+            if (paramDef.type === 'number') {
+              params[paramDef.key] = Number(value)
+              if (isNaN(params[paramDef.key])) {
+                wx.showToast({ title: `${paramDef.label}必须是数字`, icon: 'none' })
+                return
+              }
+            } else if (paramDef.type === 'enum') {
+              // 枚举值原样发送：字典里 value 本身已是设备要的类型（工作模式是数字 129~132），
+              // 统一 Number() 会把将来出现的字符串枚举压成 NaN。
+              params[paramDef.key] = value
+            } else {
+              params[paramDef.key] = value
+            }
           }
         }
       }
@@ -304,6 +622,129 @@ createPage({
       })
     },
 
+    // 切换深色模式
+    toggleTheme() {
+      const store = useDeviceStore()
+      store.toggleDarkMode()
+      this.setData({ darkMode: store.darkMode })
+    },
+
+    // 解析设备类别：优先 product_category，缺失时用 valve_type 兜底
+    resolveDeviceCategory() {
+      const productCategory = this.data.productCategory
+      if (productCategory === 'flow_control' || productCategory === 'pilot_reducing') {
+        return productCategory
+      }
+
+      const valveType = this.data.valveType
+      if (valveType === 'flow') return 'flow_control'
+      if (valveType === 'pilot') return 'pilot_reducing'
+
+      return ''
+    },
+
+    // 获取指定设备类别允许下发的命令名列表
+    getCommandsByCategory(category) {
+      const COMMANDS_BY_CATEGORY = {
+        flow_control: ['setOpening', 'setCycle', 'setHeatDate', 'setWorkMode', 'setReturnTemp', 'setRoomTemp'],
+        pilot_reducing: ['setCycle', 'setHeatDate', 'setPressure', 'setTimePressure']
+      }
+      return COMMANDS_BY_CATEGORY[category] || []
+    },
+
+    // 先导阀命令排序：压力设置命令固定排在最前面
+    sortPilotCommands(commands) {
+      const priority = ['setPressure', 'setTimePressure']
+      const priorityCommands = []
+      const otherCommands = []
+
+      commands.forEach(cmd => {
+        if (priority.indexOf(cmd.command) !== -1) {
+          priorityCommands.push(cmd)
+        } else {
+          otherCommands.push(cmd)
+        }
+      })
+
+      priorityCommands.sort((a, b) => priority.indexOf(a.command) - priority.indexOf(b.command))
+      return [...priorityCommands, ...otherCommands]
+    },
+
+    // 规范化参数：根据命令类型强制指定控件类型与单位
+    normalizeParam(command, param) {
+      const WORK_MODE_OPTIONS = [
+        { label: '通断模式', value: 129, description: '阀门只能全开(100)或全关(0)' },
+        { label: '回水模式', value: 130, description: '根据回水温度自动调节阀门开度' },
+        { label: '室温模式', value: 131, description: '根据室内温度自动调节阀门开度' },
+        { label: '流量平衡模式', value: 132, description: '可设置任意开度(0-100)，用于流量平衡调节' },
+        { label: '停止', value: 137, description: '' }
+      ]
+
+      // 设置工作模式：强制使用枚举选择器
+      if (command === 'setWorkMode') {
+        const options = (param.type === 'enum' && Array.isArray(param.options) && param.options.length)
+          ? param.options
+          : WORK_MODE_OPTIONS
+        return {
+          ...param,
+          type: 'enum',
+          widgetType: 'enum',
+          options,
+          label: param.label || '工作模式'
+        }
+      }
+
+      // 设置周期：单位统一为「分」，标签去掉后端可能带的「(秒)/（秒）」字样
+      if (command === 'setCycle') {
+        let label = param.label || '上报周期'
+        label = label.replace(/[（(]?\s*秒\s*[)）]?/g, '').replace(/[（(]?\s*分\s*[)）]?/g, '').trim() || '上报周期'
+        return {
+          ...param,
+          type: 'number',
+          widgetType: 'number',
+          unit: '分',
+          label
+        }
+      }
+
+      // 设置压力：单位统一为「MPa」，标签去掉后端可能带的「(KPa)」字样
+      if (command === 'setPressure') {
+        let label = param.label || '设置压力'
+        label = label.replace(/[（(]?\s*[Kk][Pp][Aa]\s*[)）]?/g, '').replace(/[（(]?\s*[Mm][Pp][Aa]\s*[)）]?/g, '').trim() || '设置压力'
+        return {
+          ...param,
+          type: 'number',
+          widgetType: 'number',
+          unit: 'MPa',
+          label
+        }
+      }
+
+      // 设置供暖日期：强制使用日期选择器
+      if (command === 'setHeatDate') {
+        return {
+          ...param,
+          type: 'date',
+          widgetType: 'date',
+          label: param.label || '供暖日期'
+        }
+      }
+
+      // 默认：保持后端类型
+      return {
+        ...param,
+        widgetType: param.type === 'enum' ? 'enum' : (param.type === 'number' ? 'number' : 'text')
+      }
+    },
+
+    // 格式化日期为 YYYY-MM-DD
+    formatDate(date) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    },
+
     // 显示确认对话框
     showConfirm(content) {
       return new Promise((resolve) => {
@@ -320,244 +761,661 @@ createPage({
 })
 </script>
 
-<style lang="stylus">
-.control-page
-  min-height 100vh
-  background-color #f5f5f5
-  padding-bottom 100rpx
+<style scoped>
+/* ==================== 颜色系统与主题变量 ==================== */
+.control-container {
+  --bg-primary: #F2F2F7;
+  --bg-secondary: #FFFFFF;
+  --bg-hero: linear-gradient(150deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
 
-.device-header
-  background-color #fff
-  padding 30rpx
-  border-bottom 1px solid #e5e5e5
-  display flex
-  justify-content space-between
-  align-items flex-start
+  --text-primary: #1C1C1E;
+  --text-secondary: #8E8E93;
+  --text-tertiary: #C7C7CC;
 
-.device-title
-  display flex
-  flex-direction column
-  align-items flex-start
-  flex 1
+  --accent-primary: #007AFF;
+  --accent-success: #34C759;
+  --accent-warning: #FF9500;
+  --accent-danger: #FF3B30;
 
-.device-name
-  font-size 36rpx
-  font-weight bold
-  color #333
-  margin-bottom 12rpx
+  --shadow-card: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 8rpx 30rpx rgba(0, 0, 0, 0.12);
 
-.device-sn
-  font-size 24rpx
-  color #999
+  --radius-sm: 12rpx;
+  --radius-md: 20rpx;
+  --radius-lg: 28rpx;
 
-.history-icon
-  width 80rpx
-  height 80rpx
-  display flex
-  align-items center
-  justify-content center
-  background-color #f5f5f5
-  border-radius 50%
-  cursor pointer
-  transition all 0.3s
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding-bottom: 40rpx;
+}
 
-.history-icon:active
-  background-color #e0e0e0
-  transform scale(0.95)
+/* 深色模式主题 */
+.control-container.dark {
+  --bg-primary: #000000;
+  --bg-secondary: #1C1C1E;
+  --bg-hero: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 60%, #0040B0 100%);
 
-.history-icon .icon-text
-  font-size 40rpx
+  --text-primary: #F2F2F7;
+  --text-secondary: #98989F;
+  --text-tertiary: #636366;
 
-.platform-badge
-  display inline-block
-  padding 6rpx 16rpx
-  background-color #e6f7ff
-  color #1890ff
-  border-radius 4rpx
-  font-size 22rpx
-  border 1px solid #91d5ff
+  --accent-primary: #0A84FF;
+  --accent-success: #30D158;
+  --accent-warning: #FF9F0A;
+  --accent-danger: #FF453A;
 
-/* 加载状态 */
-.loading-section
-  display flex
-  flex-direction column
-  align-items center
-  padding 120rpx 40rpx
+  --shadow-card: 0 4rpx 20rpx rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 8rpx 30rpx rgba(0, 0, 0, 0.6);
+}
 
-.loading-spinner
-  width 60rpx
-  height 60rpx
-  border 6rpx solid #f3f3f3
-  border-top-color #1890ff
-  border-radius 50%
-  animation spinAnim 0.8s linear infinite
-  margin-bottom 24rpx
+/* ==================== 动画定义 ==================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
-.loading-text
-  font-size 28rpx
-  color #999
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-/* 空状态 */
-.empty-section
-  display flex
-  flex-direction column
-  align-items center
-  padding 120rpx 40rpx
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
-.empty-icon
-  font-size 80rpx
-  margin-bottom 24rpx
+.anim-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
 
-.empty-title
-  font-size 32rpx
-  font-weight 600
-  color #666
-  margin-bottom 16rpx
+.anim-slide-up {
+  animation: slideUp 0.6s cubic-bezier(0.22, 0.9, 0.32, 1);
+}
 
-.empty-hint
-  font-size 26rpx
-  color #999
-  text-align center
-  line-height 1.5
+.anim-slide-up.d1 {
+  animation-delay: 0.1s;
+  opacity: 0;
+  animation-fill-mode: forwards;
+}
 
-.control-section
-  margin-top 20rpx
+.anim-slide-up.d2 {
+  animation-delay: 0.2s;
+  opacity: 0;
+  animation-fill-mode: forwards;
+}
 
-.section-title
-  padding 20rpx 30rpx
-  font-size 28rpx
-  font-weight bold
-  color #333
-  background-color #fff
+/* ==================== Hero 头部 ==================== */
+.hero-section {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-hero);
+  padding: 48rpx 32rpx 56rpx;
+  margin: 0 0 32rpx 0;
+  border-radius: 0 0 48rpx 48rpx;
+}
 
-.control-card
-  background-color #fff
-  margin-bottom 20rpx
-  padding 30rpx
+.hero-deco {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
 
-.card-header
-  margin-bottom 24rpx
+.deco-1 {
+  width: 320rpx;
+  height: 320rpx;
+  top: -140rpx;
+  right: -80rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
 
-.card-title
-  font-size 32rpx
-  font-weight bold
-  color #333
-  margin-bottom 8rpx
+.deco-2 {
+  width: 180rpx;
+  height: 180rpx;
+  bottom: -60rpx;
+  left: -40rpx;
+  background: rgba(255, 255, 255, 0.05);
+}
 
-.card-desc
-  font-size 24rpx
-  color #999
-  line-height 1.4
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
 
-.card-body
-  margin-bottom 24rpx
+.device-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+}
 
-.input-row
-  display flex
-  align-items center
-  margin-bottom 20rpx
+.device-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
 
-.input-label
-  font-size 28rpx
-  color #666
-  width 180rpx
-  flex-shrink 0
+.device-name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: 1rpx;
+  word-break: break-all;
+}
 
-.input-field
-  flex 1
-  height 70rpx
-  padding 0 20rpx
-  border 1px solid #d9d9d9
-  border-radius 8rpx
-  font-size 28rpx
-  background-color #fafafa
+.device-sn {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.5rpx;
+}
 
-.card-actions
-  display flex
+.device-meta {
+  margin-top: 8rpx;
+}
 
-.btn-confirm
-  flex 1
-  height 80rpx
-  line-height 80rpx
-  border-radius 8rpx
-  font-size 30rpx
-  text-align center
-  border none
-  background-color #1890ff
-  color #fff
-  font-weight 600
-  &:active
-    background-color #096dd9
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10rpx);
+}
 
-.history-section
-  margin-top 20rpx
+.header-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
 
-.task-list
-  background-color #fff
+.theme-switch,
+.history-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
 
-.task-item
-  display flex
-  justify-content space-between
-  align-items center
-  padding 30rpx
-  border-bottom 1px solid #f0f0f0
-  &:last-child
-    border-bottom none
+.theme-switch:active {
+  transform: scale(0.9) rotate(-15deg);
+}
 
-.task-info
-  flex 1
-  display flex
-  flex-direction column
-  gap 10rpx
+.history-btn:active {
+  transform: scale(0.9);
+}
 
-.task-command
-  font-size 28rpx
-  color #333
-  font-weight bold
+.theme-icon,
+.history-icon {
+  font-size: 32rpx;
+  color: #FFFFFF;
+}
 
-.task-params
-  font-size 26rpx
-  color #666
+/* ==================== 内容包装器 ==================== */
+.content-wrapper {
+  padding: 0 24rpx;
+}
 
-.task-time
-  font-size 24rpx
-  color #999
+/* ==================== 加载与空状态 ==================== */
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 40rpx;
+}
 
-.task-status
-  padding 10rpx 20rpx
-  border-radius 4rpx
-  font-size 24rpx
-  &.status-success
-    background-color #f6ffed
-    color #52c41a
-  &.status-fail
-    background-color #fff2f0
-    color #ff4d4f
-  &.status-pending
-    background-color #e6f7ff
-    color #1890ff
+.loading-spinner {
+  width: 60rpx;
+  height: 60rpx;
+  border: 6rpx solid var(--bg-primary);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: rotate 0.8s linear infinite;
+  margin-bottom: 24rpx;
+}
 
-.safety-notice
-  display flex
-  align-items center
-  justify-content center
-  padding 30rpx
-  margin 20rpx 30rpx
-  background-color #fffbe6
-  border 1px solid #ffe58f
-  border-radius 8rpx
+.loading-text {
+  font-size: 28rpx;
+  color: var(--text-secondary);
+}
 
-.notice-icon
-  font-size 32rpx
-  margin-right 15rpx
+.empty-icon {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+  margin-bottom: 32rpx;
+}
 
-.notice-text
-  font-size 24rpx
-  color #d48806
+.empty-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24rpx;
+  height: 24rpx;
+  margin: -12rpx 0 0 -12rpx;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.empty-wave {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  border: 3rpx solid var(--text-tertiary);
+  opacity: 0.3;
+}
+
+.wave-1 {
+  width: 60rpx;
+  height: 60rpx;
+  margin: -30rpx 0 0 -30rpx;
+}
+
+.wave-2 {
+  width: 100rpx;
+  height: 100rpx;
+  margin: -50rpx 0 0 -50rpx;
+  opacity: 0.2;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  font-size: 26rpx;
+  color: var(--text-tertiary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ==================== 控制列表 ==================== */
+.control-list {
+  padding-bottom: 24rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+  padding-left: 4rpx;
+}
+
+.header-accent {
+  width: 6rpx;
+  height: 28rpx;
+  border-radius: 4rpx;
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary));
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.5rpx;
+}
+
+/* ==================== 命令卡片（参考蓝牙控制页 pf-field 风格） ==================== */
+.command-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 28rpx;
+  margin-bottom: 28rpx;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.command-card:active {
+  transform: scale(0.995);
+}
+
+.command-title {
+  display: block;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 2rpx;
+  margin-bottom: 8rpx;
+}
+
+.command-desc {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 24rpx;
+}
+
+/* ==================== 参数输入（标签在左，输入框在右） ==================== */
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.param-row:last-child {
+  margin-bottom: 0;
+}
+
+.param-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  width: 140rpx;
+}
+
+.param-input-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.param-input {
+  flex: 1;
+  min-width: 0;
+  height: 80rpx;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 28rpx;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  text-align: left;
+}
+
+.param-unit {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 40rpx;
+  text-align: center;
+}
+
+.param-picker {
+  width: 100%;
+  height: 80rpx;
+  padding: 0;
+  box-sizing: border-box;
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+.picker-display {
+  width: 100%;
+  height: 80rpx;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.picker-value {
+  font-size: 28rpx;
+  color: var(--text-primary);
+}
+
+.picker-arrow {
+  font-size: 32rpx;
+  color: var(--text-tertiary);
+}
+
+.param-hint {
+  margin-top: 4rpx;
+  margin-bottom: 16rpx;
+}
+
+.param-hint-text {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ==================== 执行按钮（参考蓝牙「设定」按钮） ==================== */
+.card-actions {
+  display: flex;
+  margin-top: 20rpx;
+}
+
+.btn-set {
+  margin-left: auto;
+  height: 60rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent-success);
+  color: #FFFFFF;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.btn-set::after {
+  border: none;
+}
+
+.btn-set:active {
+  opacity: 0.75;
+  transform: scale(0.96);
+}
+
+/* ==================== 分时压力 ==================== */
+.tp-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid var(--bg-tertiary);
+}
+
+.tp-main-label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tp-main-switch {
+  transform: scale(0.85);
+}
+
+.tp-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.tp-slot {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 20rpx;
+  transition: opacity 0.2s ease;
+}
+
+.tp-slot.tp-disabled {
+  opacity: 0.55;
+}
+
+.tp-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.tp-slot-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tp-slot-switch {
+  transform: scale(0.75);
+}
+
+.tp-slot-body {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.tp-time-picker {
+  flex-shrink: 0;
+}
+
+.tp-time-val {
+  width: 140rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 28rpx;
+  color: var(--text-primary);
+}
+
+.tp-time-val.tp-off {
+  color: var(--text-tertiary);
+}
+
+.tp-pressure-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.tp-pressure-input {
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 16rpx;
+  box-sizing: border-box;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 28rpx;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  text-align: left;
+}
+
+.tp-pressure-unit {
+  font-size: 22rpx;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* ==================== 安全提示 ==================== */
+.safety-banner {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 28rpx;
+  margin-top: 8rpx;
+  background: rgba(255, 149, 0, 0.08);
+  border: 1rpx solid rgba(255, 149, 0, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.safety-icon {
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-warning);
+  color: #FFFFFF;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.safety-text {
+  flex: 1;
+  font-size: 24rpx;
+  color: var(--accent-warning);
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+/* ==================== 深色模式覆盖 ==================== */
+.control-container.dark .command-card {
+  border: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.control-container.dark .command-title {
+  color: var(--accent-success);
+}
+
+.control-container.dark .param-input {
+  background: #2C2C2E;
+  color: var(--text-primary);
+}
+
+.control-container.dark .picker-display {
+  background: #2C2C2E;
+}
+
+.control-container.dark .btn-set {
+  background: transparent;
+  border: 1rpx solid var(--accent-success);
+  color: var(--accent-success);
+}
+
+.control-container.dark .tp-slot {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.control-container.dark .tp-time-val,
+.control-container.dark .tp-pressure-input {
+  background: #2C2C2E;
+  color: var(--text-primary);
+}
+
+.control-container.dark .safety-banner {
+  background: rgba(255, 159, 10, 0.1);
+  border-color: rgba(255, 159, 10, 0.25);
+}
 </style>
 
 <style>
-/* 旋转动画 - 使用纯CSS避免Stylus添加-moz-前缀 */
+/* 旋转动画 - 供 loading-spinner 使用 */
 @keyframes spinAnim {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -567,7 +1425,7 @@ createPage({
 <script type="application/json">
 {
   "navigationBarTitleText": "远程控制",
-  "navigationBarBackgroundColor": "#ffffff",
-  "navigationBarTextStyle": "black"
+  "navigationBarBackgroundColor": "#007AFF",
+  "navigationBarTextStyle": "white"
 }
 </script>
