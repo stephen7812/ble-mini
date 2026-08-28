@@ -1,0 +1,752 @@
+<template>
+  <view class="control-page">
+    <!-- 设备信息头部 -->
+    <view class="device-header">
+      <view class="device-title">
+        <text class="device-name">{{ deviceName }}</text>
+        <text class="device-sn">SN: {{ deviceSn }}</text>
+      </view>
+      <view class="platform-badge" wx:if="{{ platformInfo }}">
+        <text class="platform-text">{{ platformInfo }}</text>
+      </view>
+    </view>
+
+    <!-- 加载状态 -->
+    <view class="loading-section" wx:if="{{ loadingCommands }}">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">正在加载设备支持的控制功能...</text>
+    </view>
+
+    <!-- 暂无可用控制功能 -->
+    <view class="empty-section" wx:if="{{ !loadingCommands && availableCommands.length === 0 }}">
+      <text class="empty-icon">⚠️</text>
+      <text class="empty-title">暂无可用控制功能</text>
+      <text class="empty-hint">该设备暂不支持远程控制，或网络连接异常</text>
+    </view>
+
+    <!-- 快捷控制卡片 -->
+    <view class="control-section" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
+      <view class="section-title">快捷控制</view>
+
+      <!-- 开度设定 - 仅当设备支持时显示 -->
+      <view class="control-card" wx:if="{{ supportsCommand('set_openness') }}">
+        <view class="card-header">
+          <text class="card-title">开度设定</text>
+          <text class="card-hint">当前: {{ currentOpenness }}%</text>
+        </view>
+        <view class="card-body">
+          <view class="input-row">
+            <text class="input-label">目标开度</text>
+            <input
+              class="input-field"
+              type="digit"
+              value="{{ targetOpenness }}"
+              placeholder="请输入开度值"
+              bindinput="handleOpennessInput"
+            />
+            <text class="input-unit">%</text>
+          </view>
+          <text class="input-hint">范围: 0 ~ 100 %</text>
+        </view>
+        <view class="card-actions">
+          <button class="btn-small btn-cancel" bindtap="resetOpenness">重置</button>
+          <button class="btn-small btn-confirm" bindtap="handleSetOpenness">确认设定</button>
+        </view>
+      </view>
+
+      <!-- 压力设定 - 仅当设备支持时显示 -->
+      <view class="control-card" wx:if="{{ supportsCommand('set_pressure') }}">
+        <view class="card-header">
+          <text class="card-title">压力设定</text>
+          <text class="card-hint">当前: {{ currentPressure }} MPa</text>
+        </view>
+        <view class="card-body">
+          <view class="input-row">
+            <text class="input-label">目标压力</text>
+            <input
+              class="input-field"
+              type="digit"
+              value="{{ targetPressure }}"
+              placeholder="请输入压力值"
+              bindinput="handlePressureInput"
+            />
+            <text class="input-unit">MPa</text>
+          </view>
+          <text class="input-hint">范围: 0.0 ~ 1.6 MPa</text>
+        </view>
+        <view class="card-actions">
+          <button class="btn-small btn-cancel" bindtap="resetPressure">重置</button>
+          <button class="btn-small btn-confirm" bindtap="handleSetPressure">确认设定</button>
+        </view>
+      </view>
+
+      <!-- 温度设定 - 仅当设备支持时显示 -->
+      <view class="control-card" wx:if="{{ supportsCommand('set_temperature') }}">
+        <view class="card-header">
+          <text class="card-title">温度设定</text>
+          <text class="card-hint">当前: {{ currentTemperature }}°C</text>
+        </view>
+        <view class="card-body">
+          <view class="input-row">
+            <text class="input-label">目标温度</text>
+            <input
+              class="input-field"
+              type="digit"
+              value="{{ targetTemperature }}"
+              placeholder="请输入温度值"
+              bindinput="handleTemperatureInput"
+            />
+            <text class="input-unit">°C</text>
+          </view>
+          <text class="input-hint">范围: 5 ~ 95°C</text>
+        </view>
+        <view class="card-actions">
+          <button class="btn-small btn-cancel" bindtap="resetTemperature">重置</button>
+          <button class="btn-small btn-confirm" bindtap="handleSetTemperature">确认设定</button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 历史操作记录 -->
+    <view class="history-section" wx:if="{{ taskList.length > 0 }}">
+      <view class="section-title">历史操作</view>
+      <view class="task-list">
+        <view class="task-item" wx:for="{{ taskList }}" wx:key="id">
+          <view class="task-info">
+            <text class="task-command">{{ formatCommand(item.command) }}</text>
+            <text class="task-params">{{ formatParams(item.params) }}</text>
+            <text class="task-time">{{ formatTime(item.executed_at || item.created_at) }}</text>
+          </view>
+          <view class="task-status" :class="getStatusClass(item.status)">
+            {{ getStatusText(item.status) }}
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部安全提示 -->
+    <view class="safety-notice" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
+      <text class="notice-icon">⚠️</text>
+      <text class="notice-text">远程控制将直接作用于设备，请谨慎操作</text>
+    </view>
+  </view>
+</template>
+
+<script>
+import { createPage } from '@mpxjs/core'
+import { sendControlCommand, getControlTaskList, getDeviceRealtime, getDeviceCommands, getDeviceBySn } from '../../services/api/tenant'
+
+createPage({
+  data: {
+    deviceSn: '',
+    deviceId: null,
+    deviceName: '',
+    // 设备平台信息
+    platformInfo: '',
+    // 设备支持的指令列表
+    availableCommands: [],
+    loadingCommands: true,
+    // 当前值（从实时数据获取）
+    currentPressure: '-',
+    currentTemperature: '-',
+    currentOpenness: '-',
+    // 目标值（用户输入）
+    targetPressure: '',
+    targetTemperature: '',
+    targetOpenness: '',
+    // 操作历史
+    taskList: []
+  },
+
+  onLoad(options) {
+    const { sn, deviceId, name } = options
+    if (!sn || !deviceId) {
+      wx.showToast({ title: '缺少设备参数', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 1500)
+      return
+    }
+
+    this.setData({
+      deviceSn: sn,
+      deviceId: parseInt(deviceId),
+      deviceName: name || sn
+    })
+
+    // 先获取设备完整信息（包含平台信息），再查询支持的指令
+    this.loadDeviceInfo()
+  },
+
+  methods: {
+    // 加载设备完整信息（包含平台、产品等信息）
+    async loadDeviceInfo() {
+      try {
+        const device = await getDeviceBySn(this.data.deviceSn)
+
+        // 保存设备信息，用于后续判断平台类型
+        this.deviceInfo = device
+
+        // 更新设备名称
+        if (device.name) {
+          this.setData({ deviceName: device.name })
+        }
+
+        // 获取设备支持的指令列表
+        this.loadAvailableCommands()
+
+      } catch (e) {
+        console.error('加载设备信息失败:', e)
+        wx.showModal({
+          title: '加载失败',
+          content: '无法获取设备信息，请检查网络后重试',
+          confirmText: '重试',
+          cancelText: '返回',
+          success: (res) => {
+            if (res.confirm) {
+              this.loadDeviceInfo()
+            } else {
+              wx.navigateBack()
+            }
+          }
+        })
+      }
+    },
+
+    // 加载设备支持的指令列表
+    async loadAvailableCommands() {
+      this.setData({ loadingCommands: true })
+      try {
+        const result = await getDeviceCommands(this.data.deviceSn)
+
+        // 打印完整的API返回数据，用于调试
+        console.log('getDeviceCommands 返回数据:', JSON.stringify(result, null, 2))
+
+        // 解析返回的指令列表
+        // 可能的格式：
+        // 1. { commands: ['set_openness', 'set_temperature'] }
+        // 2. { data: { commands: [...] } }
+        // 3. 直接是数组 ['set_openness', 'set_temperature']
+        // 4. { list: [...] }
+        let commands = []
+        if (Array.isArray(result)) {
+          commands = result
+        } else if (result.commands && Array.isArray(result.commands)) {
+          commands = result.commands
+        } else if (result.data && result.data.commands && Array.isArray(result.data.commands)) {
+          commands = result.data.commands
+        } else if (result.list && Array.isArray(result.list)) {
+          commands = result.list
+        } else {
+          console.warn('无法解析指令列表，返回数据格式:', result)
+        }
+
+        console.log('解析后的指令列表:', commands)
+
+        // 获取平台信息用于显示
+        let platformInfo = ''
+        if (this.deviceInfo) {
+          const model = this.deviceInfo.model
+          if (model && model.iot_platform) {
+            platformInfo = model.iot_platform.name || ''
+          }
+        }
+
+        this.setData({
+          availableCommands: commands,
+          platformInfo: platformInfo,
+          loadingCommands: false
+        })
+
+        // 有支持的指令后，再加载设备状态和历史
+        if (commands.length > 0) {
+          this.loadDeviceStatus()
+          this.loadTaskHistory()
+        } else {
+          console.warn('设备没有可用的控制指令')
+          // 仍然尝试加载状态和历史
+          this.loadDeviceStatus()
+          this.loadTaskHistory()
+        }
+      } catch (e) {
+        console.error('加载设备支持指令失败:', e)
+        this.setData({
+          availableCommands: [],
+          loadingCommands: false
+        })
+
+        // 显示更详细的错误信息
+        let errorMsg = '无法获取设备支持的控制指令'
+        if (e.message) {
+          errorMsg = e.message
+        }
+
+        wx.showModal({
+          title: '加载失败',
+          content: errorMsg + '\n\n错误详情: ' + JSON.stringify(e),
+          showCancel: false
+        })
+
+        // 即使加载失败也尝试加载状态和历史（降级处理）
+        this.loadDeviceStatus()
+        this.loadTaskHistory()
+      }
+    },
+
+    // 判断设备是否支持某个指令
+    supportsCommand(command) {
+      return this.data.availableCommands.includes(command)
+    },
+
+    // 加载设备当前状态
+    async loadDeviceStatus() {
+      try {
+        const data = await getDeviceRealtime(this.data.deviceSn)
+        if (data && data.data) {
+          this.setData({
+            currentPressure: data.data.intake_pressure != null ? data.data.intake_pressure.toFixed(1) : '-',
+            currentTemperature: data.data.temp_set != null ? data.data.temp_set.toFixed(1) : '-',
+            currentOpenness: data.data.openness != null ? data.data.openness : '-'
+          })
+        }
+      } catch (e) {
+        console.error('加载设备状态失败:', e)
+      }
+    },
+
+    // 加载操作历史
+    async loadTaskHistory() {
+      try {
+        const result = await getControlTaskList(1, 10)
+        // 只显示当前设备的任务
+        this.setData({
+          taskList: (result.list || []).filter(task => task.device_sn === this.data.deviceSn)
+        })
+      } catch (e) {
+        console.error('加载操作历史失败:', e)
+      }
+    },
+
+    // 开度输入
+    handleOpennessInput(e) {
+      this.setData({ targetOpenness: e.detail.value })
+    },
+
+    // 压力输入
+    handlePressureInput(e) {
+      this.setData({ targetPressure: e.detail.value })
+    },
+
+    // 温度输入
+    handleTemperatureInput(e) {
+      this.setData({ targetTemperature: e.detail.value })
+    },
+
+    // 重置开度
+    resetOpenness() {
+      this.setData({ targetOpenness: '' })
+    },
+
+    // 重置压力
+    resetPressure() {
+      this.setData({ targetPressure: '' })
+    },
+
+    // 重置温度
+    resetTemperature() {
+      this.setData({ targetTemperature: '' })
+    },
+
+    // 设置开度
+    async handleSetOpenness() {
+      const openness = parseFloat(this.data.targetOpenness)
+
+      // 参数校验
+      if (isNaN(openness)) {
+        wx.showToast({ title: '请输入有效的开度值', icon: 'none' })
+        return
+      }
+      if (openness < 0 || openness > 100) {
+        wx.showToast({ title: '开度值范围: 0 ~ 100 %', icon: 'none' })
+        return
+      }
+
+      // 二次确认
+      const confirm = await this.showConfirm(`确定将目标开度设定为 ${openness.toFixed(0)}% 吗？`)
+      if (!confirm) return
+
+      await this.sendCommand('set_openness', { openness: Math.round(openness) })
+    },
+
+    // 设置压力
+    async handleSetPressure() {
+      const pressure = parseFloat(this.data.targetPressure)
+
+      // 参数校验
+      if (isNaN(pressure)) {
+        wx.showToast({ title: '请输入有效的压力值', icon: 'none' })
+        return
+      }
+      if (pressure < 0 || pressure > 1.6) {
+        wx.showToast({ title: '压力值范围: 0.0 ~ 1.6 MPa', icon: 'none' })
+        return
+      }
+
+      // 二次确认
+      const confirm = await this.showConfirm(`确定将目标压力设定为 ${pressure.toFixed(2)} MPa 吗？`)
+      if (!confirm) return
+
+      // 后端接口使用 kPa 单位，需要转换：MPa × 1000 = kPa
+      await this.sendCommand('set_pressure', { pressure: pressure * 1000 })
+    },
+
+    // 设置温度
+    async handleSetTemperature() {
+      const temperature = parseFloat(this.data.targetTemperature)
+
+      // 参数校验
+      if (isNaN(temperature)) {
+        wx.showToast({ title: '请输入有效的温度值', icon: 'none' })
+        return
+      }
+      if (temperature < 5 || temperature > 95) {
+        wx.showToast({ title: '温度值范围: 5 ~ 95°C', icon: 'none' })
+        return
+      }
+
+      // 二次确认
+      const confirm = await this.showConfirm(`确定将目标温度设定为 ${temperature.toFixed(1)}°C 吗？`)
+      if (!confirm) return
+
+      await this.sendCommand('set_temperature', { temperature })
+    },
+
+    // 发送控制指令（统一处理）
+    async sendCommand(command, params) {
+      wx.showLoading({ title: '指令下发中...', mask: true })
+
+      try {
+        await sendControlCommand(this.data.deviceId, command, params)
+
+        wx.hideLoading()
+        wx.showToast({ title: '指令下发成功', icon: 'success' })
+
+        // 刷新操作历史
+        setTimeout(() => this.loadTaskHistory(), 500)
+
+        // 延迟刷新设备数据（等待设备执行）
+        setTimeout(() => this.loadDeviceStatus(), 3000)
+
+      } catch (e) {
+        wx.hideLoading()
+        wx.showModal({
+          title: '指令下发失败',
+          content: e.message || '请检查网络连接后重试',
+          showCancel: false
+        })
+      }
+    },
+
+    // 显示确认对话框
+    showConfirm(content) {
+      return new Promise((resolve) => {
+        wx.showModal({
+          title: '确认操作',
+          content,
+          success: (res) => {
+            resolve(res.confirm)
+          }
+        })
+      })
+    },
+
+    // 格式化命令名称
+    formatCommand(command) {
+      const commandMap = {
+        'set_openness': '开度设定',
+        'set_pressure': '压力设定',
+        'set_temperature': '温度设定'
+      }
+      return commandMap[command] || command
+    },
+
+    // 格式化参数
+    formatParams(paramsJson) {
+      if (!paramsJson) return ''
+      try {
+        const params = JSON.parse(paramsJson)
+        // 后端存储的是 kPa，显示时转换为 MPa
+        if (params.pressure != null) return `${(params.pressure / 1000).toFixed(2)} MPa`
+        if (params.temperature != null) return `${params.temperature}°C`
+        if (params.openness != null) return `${params.openness}%`
+        return JSON.stringify(params)
+      } catch (e) {
+        return paramsJson
+      }
+    },
+
+    // 格式化时间
+    formatTime(timestamp) {
+      if (!timestamp) return ''
+      const date = new Date(timestamp * 1000)
+      return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+    },
+
+    // 获取状态样式类
+    getStatusClass(status) {
+      if (status === 1) return 'status-success'
+      if (status === 3 || status === 4) return 'status-fail'
+      return 'status-pending'
+    },
+
+    // 获取状态文本
+    getStatusText(status) {
+      const statusMap = {
+        0: '待执行',
+        1: '成功',
+        3: '失败',
+        4: '已取消'
+      }
+      return statusMap[status] || '未知'
+    }
+  }
+})
+</script>
+
+<style lang="stylus">
+.control-page
+  min-height 100vh
+  background-color #f5f5f5
+  padding-bottom 100rpx
+
+.device-header
+  background-color #fff
+  padding 30rpx
+  border-bottom 1px solid #e5e5e5
+
+.device-title
+  display flex
+  align-items baseline
+
+.device-name
+  font-size 36rpx
+  font-weight bold
+  color #333
+  margin-right 20rpx
+
+.device-sn
+  font-size 24rpx
+  color #999
+
+/* 加载状态 */
+.loading-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.loading-spinner
+  width 60rpx
+  height 60rpx
+  border 6rpx solid #f3f3f3
+  border-top-color #1890ff
+  border-radius 50%
+  animation spinAnim 0.8s linear infinite
+  margin-bottom 24rpx
+
+.loading-text
+  font-size 28rpx
+  color #999
+
+/* 空状态 */
+.empty-section
+  display flex
+  flex-direction column
+  align-items center
+  padding 120rpx 40rpx
+
+.empty-icon
+  font-size 80rpx
+  margin-bottom 24rpx
+
+.empty-title
+  font-size 32rpx
+  font-weight 600
+  color #666
+  margin-bottom 16rpx
+
+.empty-hint
+  font-size 26rpx
+  color #999
+  text-align center
+  line-height 1.5
+
+.control-section
+  margin-top 20rpx
+
+.section-title
+  padding 20rpx 30rpx
+  font-size 28rpx
+  font-weight bold
+  color #333
+  background-color #fff
+
+.control-card
+  background-color #fff
+  margin-bottom 20rpx
+  padding 30rpx
+
+.card-header
+  display flex
+  justify-content space-between
+  align-items center
+  margin-bottom 30rpx
+
+.card-title
+  font-size 32rpx
+  font-weight bold
+  color #333
+
+.card-hint
+  font-size 24rpx
+  color #999
+
+.card-body
+  margin-bottom 30rpx
+
+.input-row
+  display flex
+  align-items center
+  margin-bottom 15rpx
+
+.input-label
+  font-size 28rpx
+  color #666
+  width 150rpx
+
+.input-field
+  flex 1
+  height 70rpx
+  padding 0 20rpx
+  border 1px solid #d9d9d9
+  border-radius 8rpx
+  font-size 28rpx
+
+.input-unit
+  font-size 24rpx
+  color #999
+  margin-left 15rpx
+  width 80rpx
+
+.input-hint
+  font-size 24rpx
+  color #999
+  padding-left 150rpx
+
+.card-actions
+  display flex
+  gap 20rpx
+
+.btn-small
+  flex 1
+  height 70rpx
+  line-height 70rpx
+  border-radius 8rpx
+  font-size 28rpx
+  text-align center
+  border none
+
+.btn-cancel
+  background-color #fff
+  color #666
+  border 1px solid #d9d9d9
+  &:active
+    background-color #fafafa
+
+.btn-confirm
+  background-color #1890ff
+  color #fff
+  &:active
+    background-color #096dd9
+
+.history-section
+  margin-top 20rpx
+
+.task-list
+  background-color #fff
+
+.task-item
+  display flex
+  justify-content space-between
+  align-items center
+  padding 30rpx
+  border-bottom 1px solid #f0f0f0
+  &:last-child
+    border-bottom none
+
+.task-info
+  flex 1
+  display flex
+  flex-direction column
+  gap 10rpx
+
+.task-command
+  font-size 28rpx
+  color #333
+  font-weight bold
+
+.task-params
+  font-size 26rpx
+  color #666
+
+.task-time
+  font-size 24rpx
+  color #999
+
+.task-status
+  padding 10rpx 20rpx
+  border-radius 4rpx
+  font-size 24rpx
+  &.status-success
+    background-color #f6ffed
+    color #52c41a
+  &.status-fail
+    background-color #fff2f0
+    color #ff4d4f
+  &.status-pending
+    background-color #e6f7ff
+    color #1890ff
+
+.safety-notice
+  display flex
+  align-items center
+  justify-content center
+  padding 30rpx
+  margin-top 20rpx
+  background-color #fffbe6
+  border 1px solid #ffe58f
+  border-radius 8rpx
+  margin 20rpx 30rpx
+
+.notice-icon
+  font-size 32rpx
+  margin-right 15rpx
+
+.notice-text
+  font-size 24rpx
+  color #d48806
+</style>
+
+<style>
+/* 旋转动画 - 使用纯CSS避免Stylus添加-moz-前缀 */
+@keyframes spinAnim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
+
+<script type="application/json">
+{
+  "navigationBarTitleText": "远程控制",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black"
+}
+</script>

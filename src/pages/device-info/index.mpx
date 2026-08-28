@@ -1,22 +1,22 @@
 <template>
   <view class="page">
-    <view wx:if="{{valveTypeId === 'new'}}" class="card">
-      <text class="text-sm font-bold mb-8">压力设置</text>
+    <view wx:if="{{valveTypeId === 'new'}}" class="card riveted">
+      <text class="section-title mb-8">压力设置</text>
       <view class="form-item">
         <text class="form-label">目标压力 (MPa)</text>
-        <input class="form-input" type="digit" model:value="{{targetPressure}}" placeholder="0 ~ 2.5" />
+        <input class="form-input mono" type="digit" model:value="{{targetPressure}}" placeholder="0 ~ 2.5" />
       </view>
       <button class="btn-primary" bindtap="setPressure">设置压力</button>
 
       <view class="form-item mt-16">
-        <text class="form-label">进水压力补偿 (MPa)</text>
-        <input class="form-input" type="digit" model:value="{{inletComp}}" placeholder="-0.12 ~ 0.12" />
+        <text class="form-label">阀前压力补偿 (MPa)</text>
+        <input class="form-input mono" type="digit" model:value="{{inletComp}}" placeholder="-0.12 ~ 0.12" />
       </view>
       <button class="btn-outline mt-8" bindtap="setPressureComp">设置补偿</button>
     </view>
 
-    <view wx:if="{{valveTypeId === 'old'}}" class="card">
-      <text class="text-sm font-bold mb-8">开度设置</text>
+    <view wx:if="{{valveTypeId === 'old'}}" class="card riveted">
+      <text class="section-title mb-8">开度设置</text>
       <view class="form-item">
         <text class="form-label">阀门开度 (%)</text>
         <slider min="0" max="100" model:value="{{targetOpening}}" show-value />
@@ -26,14 +26,14 @@
       <view class="form-item mt-16">
         <text class="form-label">工作模式</text>
         <picker model:value="{{workModeIndex}}" range="{{workModes}}" bindchange="onWorkModeChange">
-          <view class="form-input">{{workModes[workModeIndex]}}</view>
+          <view class="form-input mono">{{workModes[workModeIndex]}}</view>
         </picker>
       </view>
       <button class="btn-outline mt-8" bindtap="setMode">设置模式</button>
     </view>
 
-    <view class="card mt-16">
-      <text class="text-sm font-bold mb-8">设备维护</text>
+    <view class="card riveted mt-16">
+      <text class="section-title mb-8">设备维护</text>
       <view class="action-row">
         <button class="btn-outline" bindtap="deviceReset">复位</button>
         <button class="btn-outline" bindtap="deviceRestart">重启</button>
@@ -95,13 +95,30 @@ createPage({
 
 <style scoped>
 .page { padding: 24rpx 24rpx 48rpx; }
-.form-item { margin-bottom: 20rpx; }
-.form-label { font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary); display: block; margin-bottom: 12rpx; }
-.form-input {
-  width: 100%; height: 88rpx; border: 2rpx solid transparent; border-radius: 20rpx;
-  background: var(--color-fill); padding: 0 28rpx; font-size: 28rpx;
-  color: var(--color-text); box-sizing: border-box;
+
+/* 章节标题：工业铭牌风 + 主色左标条 */
+.card .section-title {
+  border-left: 8rpx solid var(--color-primary);
+  padding-left: 16rpx;
+  line-height: 1.4;
 }
+
+.form-item { margin-bottom: 20rpx; }
+.form-label {
+  font-size: 24rpx; font-weight: 500; letter-spacing: 2rpx;
+  color: var(--color-text-secondary); display: block; margin-bottom: 12rpx;
+}
+
+/* 输入框：内凹金属槽 */
+.form-input {
+  width: 100%; height: 88rpx;
+  border: 2rpx solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-panel-2); padding: 0 28rpx; font-size: 28rpx;
+  color: var(--color-text); box-sizing: border-box;
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset), inset -1rpx -1rpx 0 var(--color-highlight);
+}
+.form-input:focus { border-color: var(--color-primary); }
+
 .action-row { display: flex; gap: 20rpx; }
 .action-row > button { flex: 1; }
 .action-row .btn-outline { padding: 22rpx 0; }

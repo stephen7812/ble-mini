@@ -1,10 +1,10 @@
 <template>
-  <view class="page {{darkMode ? 'dark' : ''}}">
-    <view class="card">
-      <view class="row"><text class="label">设备编号</text><text class="value">{{form.sn}}</text></view>
+  <view class="page {{themeClass}}">
+    <view class="card riveted">
+      <view class="row"><text class="label">设备编号</text><text class="value mono">{{form.sn}}</text></view>
       <view class="row">
         <text class="label">设备名称</text>
-        <input class="input" value="{{form.name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onNameInput" />
+        <input class="input field-input" value="{{form.name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onNameInput" />
       </view>
       <view class="row">
         <text class="label">所属小区</text>
@@ -20,27 +20,27 @@
       <view class="row"><text class="label">省市区</text><text class="value muted">{{regionText || '选择小区后自动带出'}}</text></view>
       <view class="row">
         <text class="label">详细地址</text>
-        <input class="input" value="{{form.address}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onAddressInput" />
+        <input class="input field-input" value="{{form.address}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onAddressInput" />
       </view>
       <view class="row"><text class="label">经纬度</text><text class="value muted">{{coordText}}</text></view>
       <view class="hint">省市区与经纬度取自所属小区，需要修改请到网页端的小区管理页</view>
     </view>
 
-    <view class="card">
+    <view class="card riveted">
       <view class="card-title">安装信息</view>
       <view class="row">
         <text class="label">安装人</text>
-        <input class="input" value="{{form.installer_name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onInstallerInput" />
+        <input class="input field-input" value="{{form.installer_name}}" placeholder="请输入" placeholder-class="input-placeholder" bindinput="onInstallerInput" />
       </view>
       <view class="row">
         <text class="label">安装日期</text>
-        <picker mode="date" value="{{installDate}}" bindchange="onDateChange">
+        <picker class="picker" mode="date" value="{{installDate}}" bindchange="onDateChange">
           <text class="value">{{installDate || '请选择'}}</text>
         </picker>
       </view>
       <view class="row">
         <text class="label">备注</text>
-        <input class="input" value="{{form.remark}}" placeholder="选填" placeholder-class="input-placeholder" bindinput="onRemarkInput" />
+        <input class="input field-input" value="{{form.remark}}" placeholder="选填" placeholder-class="input-placeholder" bindinput="onRemarkInput" />
       </view>
       <view class="photos">
         <view class="photo-wrap" wx:for="{{form.install_photos}}" wx:for-index="photoIdx" wx:key="*this">
@@ -69,7 +69,7 @@ createPage({
   data: {
     sn: '',
     saving: false,
-    darkMode: false,
+    themeClass: '',
     communities: [],
     communityNames: [],
     communityIndex: -1,
@@ -96,7 +96,7 @@ createPage({
   },
 
   onLoad(query) {
-    this.setData({ sn: decodeURIComponent(query.sn || ''), darkMode: useDeviceStore().darkMode })
+    this.setData({ sn: decodeURIComponent(query.sn || ''), themeClass: useDeviceStore().themeClass })
     // 进页面先挡一道，避免用户从历史栈直接回到这一页绕过入口判定
     if (!useAuthStore().canInstall) {
       wx.showModal({
@@ -337,16 +337,28 @@ createPage({
 <style scoped>
 .page { padding: 24rpx 24rpx 48rpx; min-height: 100vh; box-sizing: border-box; }
 
-.card {
-  padding: 32rpx 28rpx;
-  border-radius: 28rpx;
-  box-shadow: var(--shadow-card);
-}
+.card { margin: 0 0 24rpx; padding: 28rpx 28rpx 16rpx; }
 
+/* 金属铭牌小节：橙边条 + 螺丝点 + 加宽字距 */
 .card-title {
-  padding: 4rpx 0 16rpx;
-  font-size: 30rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx;
+  display: flex; align-items: center;
+  margin-bottom: 12rpx; padding: 12rpx 16rpx;
+  background: var(--color-panel-3);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  border-left: 8rpx solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: 26rpx; font-weight: 700; color: var(--color-text); letter-spacing: 3rpx;
+  box-shadow: inset 1rpx 1rpx 0 var(--color-highlight), inset -1rpx -1rpx 0 rgba(0, 0, 0, 0.12);
 }
+.card-title::before,
+.card-title::after {
+  content: ''; flex-shrink: 0;
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: var(--deco-rivet);
+  box-shadow: inset 0 1rpx 2rpx var(--deco-rivet-shadow), 0 1rpx 0 var(--color-highlight);
+}
+.card-title::before { margin-right: 14rpx; }
+.card-title::after { margin-left: auto; }
 
 .row {
   display: flex; align-items: center;
@@ -354,35 +366,46 @@ createPage({
   border-bottom: 1rpx solid var(--color-border);
 }
 .row:last-child { border-bottom: none; }
-.label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); }
+.label { width: 170rpx; flex-shrink: 0; font-size: 28rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
 .value { flex: 1; font-size: 28rpx; color: var(--color-text); word-break: break-all; }
 .value.muted { color: var(--color-text-tertiary); }
 
-.input { flex: 1; font-size: 28rpx; color: var(--color-text); }
+/* 内凹金属槽输入：槽底/边框/聚焦态由全局 field-input 提供 */
+.input { flex: 1; min-width: 0; min-height: 72rpx; box-sizing: border-box; padding: 10rpx 20rpx; font-size: 28rpx; color: var(--color-text); }
 .input-placeholder { color: var(--color-text-tertiary); font-size: 26rpx; }
-.picker { flex: 1; }
+.picker {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  display: flex; align-items: center;
+  padding: 14rpx 20rpx;
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
+}
 
-.hint { padding: 16rpx 0 4rpx; font-size: 24rpx; color: var(--color-text-secondary); line-height: 1.5; }
+.hint { padding: 16rpx 0 4rpx; font-size: 24rpx; color: var(--color-accent-2); line-height: 1.5; letter-spacing: 1rpx; }
 
 .photos { display: flex; flex-wrap: wrap; padding: 16rpx 0 4rpx; }
 .photo-wrap { position: relative; margin: 0 16rpx 16rpx 0; }
-.photo { width: 180rpx; height: 180rpx; border-radius: 20rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.08); }
+.photo { width: 180rpx; height: 180rpx; border-radius: var(--radius-sm); border: 1rpx solid var(--color-border); box-shadow: var(--shadow-card); }
 .photo-del {
   position: absolute; top: -12rpx; right: -12rpx;
   width: 44rpx; height: 44rpx; line-height: 40rpx; text-align: center;
-  border-radius: 50%; background: rgba(0,0,0,0.65); color: #fff; font-size: 32rpx;
-  box-shadow: 0 4rpx 10rpx rgba(0,0,0,0.2);
+  border-radius: 50%; background: var(--color-danger); color: #fff; font-size: 32rpx;
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.25);
 }
 .photo-add {
   width: 180rpx; height: 180rpx; line-height: 176rpx; text-align: center;
-  border: 2rpx dashed var(--color-border); border-radius: 20rpx;
+  border: 2rpx dashed var(--color-border); border-radius: var(--radius-sm);
   color: var(--color-text-tertiary); font-size: 60rpx;
-  background: var(--color-fill);
+  background: var(--color-panel-2);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
 }
 .photo-add:active { background: var(--color-fill-strong); }
 
-.actions { padding: 32rpx 16rpx 16rpx; }
-.btn-block { width: 100%; box-sizing: border-box; height: 96rpx; line-height: 96rpx; }
+.actions { padding: 8rpx 0 16rpx; }
+.btn-block { width: 100%; box-sizing: border-box; height: 96rpx; line-height: 92rpx; padding: 0 48rpx; }
 </style>
 
 <script type="application/json">

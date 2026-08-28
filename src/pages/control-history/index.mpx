@@ -4,7 +4,7 @@
     <view class="page-header">
       <view class="header-info">
         <text class="device-name">{{ deviceName }}</text>
-        <text class="device-sn">SN: {{ deviceSn }}</text>
+        <text class="device-sn mono">SN: {{ deviceSn }}</text>
       </view>
       <button class="btn-clear" bindtap="handleClearAll" wx:if="{{ taskList.length > 0 }}">
         清空记录
@@ -19,20 +19,21 @@
 
     <!-- 历史记录列表 -->
     <view class="history-list" wx:if="{{ !loading && taskList.length > 0 }}">
-      <view class="task-item" wx:for="{{ taskList }}" wx:key="id">
+      <view class="task-item riveted" wx:for="{{ taskList }}" wx:key="id">
         <view class="task-header">
-          <text class="task-command">{{ item.command }}</text>
+          <text class="task-command mono">{{ item.command }}</text>
           <view class="task-status {{ getStatusClass(item.status) }}">
-            {{ getStatusText(item.status) }}
+            <view class="led {{ item.status === 1 ? 'on' : (item.status === 3 || item.status === 4) ? 'err' : 'warn' }}"></view>
+            <text>{{ getStatusText(item.status) }}</text>
           </view>
         </view>
-        <view class="task-params">{{ formatParams(item.params) }}</view>
+        <view class="task-params mono">{{ formatParams(item.params) }}</view>
         <view class="task-meta">
           <text class="task-meta-item">操作人：{{ item.operator_name || '未知' }}</text>
           <text class="task-meta-item">来源：{{ getSourceText(item.source) }}</text>
         </view>
         <view class="task-footer">
-          <text class="task-time">{{ formatTime(item.executed_at || item.created_at) }}</text>
+          <text class="task-time mono">{{ formatTime(item.executed_at || item.created_at) }}</text>
         </view>
         <view class="task-result" wx:if="{{ item.result }}">
           <text class="result-label">执行结果：</text>
@@ -198,12 +199,13 @@ createPage({
 <style lang="stylus">
 .history-page
   min-height 100vh
-  background-color #f5f5f5
 
+/* ==================== 页面头部：拉丝金属铭牌横条 ==================== */
 .page-header
-  background-color #fff
+  background var(--grad-panel)
   padding 30rpx
-  border-bottom 1px solid #e5e5e5
+  border-bottom 2rpx var(--panel-border-style) var(--color-border)
+  box-shadow inset 2rpx 2rpx 0 var(--color-highlight)
   display flex
   justify-content space-between
   align-items center
@@ -214,26 +216,30 @@ createPage({
 .device-name
   font-size 36rpx
   font-weight bold
-  color #333
+  color var(--color-text)
   display block
   margin-bottom 8rpx
 
 .device-sn
   font-size 24rpx
-  color #999
+  letter-spacing 2rpx
+  color var(--color-accent-2)
 
+/* 清空按钮：危险操作描边键 */
 .btn-clear
   padding 16rpx 32rpx
   font-size 26rpx
-  background-color #ff4d4f
-  color #fff
-  border-radius 8rpx
-  border none
+  font-weight 600
+  background var(--color-panel-2)
+  color var(--color-danger)
+  border-radius var(--radius-sm)
+  border 2rpx solid var(--color-danger)
+  box-shadow inset 1rpx 1rpx 0 var(--color-highlight)
 
 .btn-clear::after
   border none
 
-/* 加载状态 */
+/* ==================== 加载状态 ==================== */
 .loading-section
   display flex
   flex-direction column
@@ -243,26 +249,32 @@ createPage({
 .loading-spinner
   width 60rpx
   height 60rpx
-  border 6rpx solid #f3f3f3
-  border-top 6rpx solid #1890ff
+  border 6rpx solid var(--color-track)
+  border-top 6rpx solid var(--color-primary)
   border-radius 50%
   animation spinAnim 0.8s linear infinite
   margin-bottom 24rpx
 
 .loading-text
   font-size 28rpx
-  color #999
+  color var(--color-text-secondary)
 
-/* 历史记录列表 */
+/* ==================== 历史记录列表 ==================== */
 .history-list
   padding 20rpx
 
+/* 历史条目：金属铭牌条（四角铆钉由全局 .riveted 提供） */
 .task-item
-  background-color #fff
+  position relative
+  background var(--grad-panel)
   padding 30rpx
   margin-bottom 20rpx
-  border-radius 16rpx
-  box-shadow 0 2rpx 8rpx rgba(0, 0, 0, 0.06)
+  border-radius var(--radius)
+  border 2rpx var(--panel-border-style) var(--color-border)
+  box-shadow inset 2rpx 2rpx 0 var(--color-highlight), inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12), var(--shadow-card)
+
+.task-item:last-child
+  margin-bottom 0
 
 .task-header
   display flex
@@ -273,33 +285,38 @@ createPage({
 .task-command
   font-size 32rpx
   font-weight 600
-  color #333
+  color var(--color-text)
   flex 1
 
+/* 状态铭牌：LED 指示灯 + 文字 */
 .task-status
+  display flex
+  align-items center
   padding 8rpx 20rpx
   border-radius 8rpx
   font-size 24rpx
-  font-weight 500
+  font-weight 600
+  background var(--color-panel-2)
+  border 1rpx solid var(--color-border)
+
+.task-status .led
+  margin-right 8rpx
 
 .status-success
-  background-color #f6ffed
-  color #52c41a
-  border 1px solid #b7eb8f
+  color var(--color-success)
+  border-color var(--color-success)
 
 .status-fail
-  background-color #fff2f0
-  color #ff4d4f
-  border 1px solid #ffccc7
+  color var(--color-danger)
+  border-color var(--color-danger)
 
 .status-pending
-  background-color #e6f7ff
-  color #1890ff
-  border 1px solid #91d5ff
+  color var(--color-warning)
+  border-color var(--color-warning)
 
 .task-params
   font-size 26rpx
-  color #666
+  color var(--color-text-secondary)
   line-height 1.6
   margin-bottom 16rpx
   word-break break-all
@@ -312,9 +329,9 @@ createPage({
 
 .task-meta-item
   font-size 24rpx
-  color #999
+  color var(--color-accent-2)
   padding 4rpx 12rpx
-  background-color #f5f5f5
+  background var(--color-fill)
   border-radius 4rpx
 
 .task-footer
@@ -324,24 +341,24 @@ createPage({
 
 .task-time
   font-size 24rpx
-  color #999
+  color var(--color-text-tertiary)
 
 .task-result
   margin-top 16rpx
   padding-top 16rpx
-  border-top 1rpx solid #f0f0f0
+  border-top 1rpx solid var(--color-border)
 
 .result-label
   font-size 24rpx
-  color #999
+  color var(--color-text-tertiary)
   margin-right 8rpx
 
 .result-text
   font-size 24rpx
-  color #666
+  color var(--color-text-secondary)
   word-break break-all
 
-/* 空状态 */
+/* ==================== 空状态 ==================== */
 .empty-section
   display flex
   flex-direction column
@@ -355,12 +372,12 @@ createPage({
 .empty-title
   font-size 32rpx
   font-weight 600
-  color #666
+  color var(--color-text-secondary)
   margin-bottom 16rpx
 
 .empty-hint
   font-size 26rpx
-  color #999
+  color var(--color-text-tertiary)
   text-align center
   line-height 1.5
 </style>

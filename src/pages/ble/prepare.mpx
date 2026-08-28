@@ -1,5 +1,5 @@
 <template>
-  <view class="page {{darkMode ? 'dark' : ''}}">
+  <view class="page {{themeClass}}">
     <!-- 头图：蓝牙标识 + 主题开关 -->
     <view class="hero anim-item d1">
       <view class="hero-deco deco-1"></view>
@@ -8,9 +8,10 @@
         <view class="brand-main">
           <text class="brand-name">蓝牙调试</text>
           <text class="brand-sub">连接设备 · 参数下发</text>
+          <text class="brand-plate">UNIT: BLE-01</text>
         </view>
         <view class="theme-btn" bindtap="toggleTheme">
-          <text class="theme-btn-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+          <text class="theme-btn-icon">{{themeIcon}}</text>
         </view>
       </view>
       <!-- 纯 CSS 蓝牙示意：中心点 + 扩散波纹 -->
@@ -22,7 +23,7 @@
     </view>
 
     <!-- 连接表单：上浮叠压头图 -->
-    <view class="card form-card anim-item d2">
+    <view class="card riveted form-card anim-item d2">
       <view class="field-group">
         <view class="field-label">设备编号</view>
         <view class="input-row">
@@ -80,7 +81,7 @@
         </view>
       </view>
 
-      <button class="confirm-btn" bindtap="goControl">开始调试</button>
+      <button class="btn-primary confirm-btn" bindtap="goControl">开始调试</button>
     </view>
 
     <!-- 连接记录 -->
@@ -88,6 +89,7 @@
       <view class="title-left">
         <view class="title-bar"></view>
         <text class="title-text">连接记录</text>
+        <text class="title-plate">Link Log</text>
       </view>
       <text class="clear-btn" wx:if="{{pairedDevices.length > 0}}" bindtap="clearHistory">清除</text>
     </view>
@@ -102,7 +104,7 @@
 
     <block wx:for="{{pairedDevices}}" wx:key="deviceId">
       <view
-        class="card history-item anim-item d3"
+        class="card riveted history-item anim-item d3"
         style="animation-delay: {{0.2 + index * 0.06}}s"
         bindtap="goControlWithDevice"
         data-device="{{item}}"
@@ -110,11 +112,11 @@
         <view class="history-dot dot-on"></view>
         <view class="history-info">
           <view class="history-top">
-            <text class="history-name">{{item.localName || item.deviceId}}</text>
+            <text class="history-name mono">{{item.localName || item.deviceId}}</text>
             <text class="history-tag">{{item.valveType || '智能调节阀'}}</text>
           </view>
         </view>
-        <text class="history-time">{{item.lastSeenText}}</text>
+        <text class="history-time num">{{item.lastSeenText}}</text>
         <text class="history-arrow">›</text>
       </view>
     </block>
@@ -134,7 +136,7 @@ const modeIds = ['broadcast', 'bluetooth']
 
 createPage({
   // 阀门类型默认先导调节阀（index 0）：现场新装设备绝大多数是这个型号
-  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 0, valveTypes, modeIndex: 0, modes, darkMode: false, focusField: '' },
+  data: { pairedDevices: [], deviceCode: '', valveTypeIndex: 0, valveTypes, modeIndex: 0, modes, themeClass: '', themeIcon: '☀️', focusField: '' },
 
   /** 从设备详情页进入时自动回填编号，不用现场再扫一次 */
   onLoad(query) {
@@ -173,7 +175,7 @@ createPage({
     }
 
     const store = useDeviceStore()
-    this.setData({ darkMode: store.darkMode })
+    this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
     this.formatDevices()
   },
 
@@ -188,7 +190,7 @@ createPage({
   toggleTheme() {
     const store = useDeviceStore()
     store.toggleDarkMode()
-    this.setData({ darkMode: store.darkMode })
+    this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
   },
 
   formatDevices() {
@@ -214,20 +216,43 @@ createPage({
     const code = this.data.deviceCode.trim()
     if (!code) { wx.showToast({ title: '请扫码或输入设备编号', icon: 'none' }); return }
     const idx = this.data.valveTypeIndex
-    const mode = modeIds[this.data.modeIndex]
+    const modeIndex = this.data.modeIndex
+    const mode = modeIds[modeIndex]
     const device = {
       deviceId: code, localName: code,
       valveType: valveTypes[idx], valveTypeId: valveTypeIds[idx],
       mode,
     }
     useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/broadcast/index' })
+
+    // 根据选择的控制模式决定跳转页面：
+    // modeIndex === 0 → 蓝牙广播模式，跳转到 broadcast 页面
+    // modeIndex === 1 → 4G/WiFi 模式，跳转到 monitor 监控页面
+    if (modeIndex === 1) {
+      // 4G/WiFi 远程模式：跳转到远程监控页面
+      wx.navigateTo({
+        url: `/pages/monitor/index?sn=${encodeURIComponent(code)}&name=${encodeURIComponent(code)}`
+      })
+    } else {
+      // 蓝牙广播模式：跳转到蓝牙控制页面
+      wx.navigateTo({ url: '/pages/broadcast/index' })
+    }
   },
 
   goControlWithDevice(e) {
     const device = e.currentTarget.dataset.device
     useDeviceStore().setCurrentDevice(device)
-    wx.navigateTo({ url: '/pages/broadcast/index' })
+
+    // 根据历史记录中保存的模式决定跳转页面
+    // mode === 'bluetooth' → 4G/WiFi 模式，跳转到 monitor 监控页面
+    // 其他情况 → 蓝牙广播模式，跳转到 broadcast 页面
+    if (device.mode === 'bluetooth') {
+      wx.navigateTo({
+        url: `/pages/monitor/index?sn=${encodeURIComponent(device.deviceId)}&name=${encodeURIComponent(device.localName || device.deviceId)}`
+      })
+    } else {
+      wx.navigateTo({ url: '/pages/broadcast/index' })
+    }
   },
 
   setValveType(e) { this.setData({ valveTypeIndex: Number(e.currentTarget.dataset.index) }) },
@@ -255,39 +280,56 @@ createPage({
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ========== 头图 ========== */
+/* ========== 头图：机头金属铭牌区 ========== */
 .hero {
   position: relative; overflow: hidden;
   margin: 0 -24rpx; padding: 56rpx 40rpx 112rpx;
-  background: linear-gradient(150deg, #4C9AFF 0%, #007AFF 48%, #0055D4 100%);
-  border-radius: 0 0 48rpx 48rpx;
+  background: linear-gradient(168deg, var(--color-panel-2) 0%, var(--color-panel-3) 68%, var(--color-bg-secondary) 100%);
+  border-bottom: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow: inset 0 2rpx 0 var(--color-highlight);
 }
 .hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
-.deco-1 { width: 320rpx; height: 320rpx; top: -130rpx; right: -80rpx; background: rgba(255, 255, 255, 0.09); }
-.deco-2 { width: 180rpx; height: 180rpx; bottom: -50rpx; left: -50rpx; background: rgba(255, 255, 255, 0.06); }
+.deco-1 { width: 320rpx; height: 320rpx; top: -130rpx; right: -80rpx; background: var(--color-fill); }
+.deco-2 { width: 180rpx; height: 180rpx; bottom: -50rpx; left: -50rpx; background: var(--color-fill); }
 .brand { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
 .brand-main { display: flex; flex-direction: column; }
-.brand-name { font-size: 46rpx; font-weight: 700; color: #fff; letter-spacing: 3rpx; }
-.brand-sub { margin-top: 12rpx; font-size: 22rpx; color: rgba(255, 255, 255, 0.72); letter-spacing: 2rpx; }
+.brand-name { font-size: 46rpx; font-weight: 700; color: var(--color-text); letter-spacing: 3rpx; }
+.brand-sub { margin-top: 12rpx; font-size: 22rpx; color: var(--color-text-secondary); letter-spacing: 2rpx; }
+/* 设备铭牌小卡 */
+.brand-plate {
+  margin-top: 16rpx; align-self: flex-start;
+  font-family: 'DIN Alternate', 'Roboto Mono', 'SF Mono', Menlo, monospace;
+  font-size: 20rpx; font-weight: 700; letter-spacing: 2rpx;
+  color: var(--color-primary);
+  background: var(--color-fill);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4rpx 14rpx;
+}
+/* 主题切换：金属旋钮 */
 .theme-btn {
   width: 64rpx; height: 64rpx; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.18); border: 1rpx solid rgba(255, 255, 255, 0.3);
-  transition: transform .2s ease;
+  background: var(--grad-btn-outline);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12);
+  transition: transform .2s ease, filter .2s ease;
 }
-.theme-btn:active { transform: scale(0.88) rotate(-15deg); }
+.theme-btn:active { transform: scale(0.88) rotate(-15deg); filter: brightness(0.95); }
 .theme-btn-icon { font-size: 30rpx; line-height: 1; }
 
-/* 蓝牙信号示意：中心点常亮，两圈波纹交替扩散 */
+/* 蓝牙信号示意：橙色 LED 常亮，两圈波纹交替扩散 */
 .ble-signal { position: absolute; right: 64rpx; bottom: 40rpx; width: 72rpx; height: 72rpx; }
 .ble-dot {
   position: absolute; left: 50%; top: 50%; width: 18rpx; height: 18rpx;
-  margin: -9rpx 0 0 -9rpx; border-radius: 50%; background: #fff;
-  box-shadow: 0 0 16rpx rgba(255, 255, 255, 0.9);
+  margin: -9rpx 0 0 -9rpx; border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 16rpx var(--color-primary);
 }
 .ble-wave {
   position: absolute; left: 50%; top: 50%; border-radius: 50%;
-  border: 3rpx solid rgba(255, 255, 255, 0.6);
+  border: 3rpx solid var(--color-primary);
   animation: bleRipple 2.4s ease-out infinite;
 }
 .ble-wave.w1 { width: 44rpx; height: 44rpx; margin: -22rpx 0 0 -22rpx; }
@@ -297,43 +339,55 @@ createPage({
   100% { opacity: 0; transform: scale(1.4); }
 }
 
-/* ========== 连接表单 ========== */
+/* ========== 连接表单：铆钉金属面板 ========== */
 .form-card {
   position: relative; z-index: 2;
   margin: -72rpx 8rpx 0; padding: 36rpx 28rpx 32rpx;
-  border-radius: 28rpx;
-  box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-float);
 }
 .field-group { margin-bottom: 28rpx; }
 .field-group:last-of-type { margin-bottom: 0; }
 .field-label {
-  font-size: 24rpx; font-weight: 500; color: var(--color-text-secondary);
+  font-size: 22rpx; font-weight: 700; letter-spacing: 2rpx;
+  color: var(--color-text-secondary);
   margin-bottom: 12rpx;
 }
 .input-row { display: flex; gap: 16rpx; }
+/* 设备编号：内凹金属槽 */
 .field-wrap {
-  flex: 1; border: 2rpx solid var(--color-border); border-radius: 16rpx;
-  background: var(--color-bg);
-  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+  flex: 1; border: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel-3);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset);
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
 .field-wrap.focused {
-  border-color: var(--color-primary); background: var(--color-card);
-  box-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.14);
+  border-color: var(--color-primary);
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(232, 115, 10, 0.18);
 }
 .field-input {
   height: 88rpx; padding: 0 24rpx; box-sizing: border-box;
   font-size: 28rpx; color: var(--color-text);
+  background: transparent; border: none; box-shadow: none;
 }
 .field-placeholder { color: var(--color-text-secondary); font-size: 26rpx; }
-/* 扫码按钮：渐变方块 + 纯 CSS 四角扫码框 */
+/* 扫码按钮：橙色金属实体键 + 纯 CSS 四角扫码框 */
 .scan-btn {
-  width: 88rpx; height: 88rpx; border-radius: 999rpx; flex-shrink: 0;
+  width: 88rpx; height: 88rpx; border-radius: var(--radius-sm); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
-  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.3);
-  transition: transform .15s ease;
+  background: var(--grad-btn-primary);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+  transition: transform .15s ease, filter .15s ease;
 }
-.scan-btn:active { transform: scale(0.92); }
+.scan-btn:active { transform: scale(0.92); filter: brightness(0.94); }
 .scan-mini { position: relative; width: 44rpx; height: 44rpx; }
 .scan-c { position: absolute; width: 14rpx; height: 14rpx; border-color: #fff; border-style: solid; }
 .scan-c.tl { top: 0; left: 0; border-width: 4rpx 0 0 4rpx; border-radius: 4rpx 0 0 0; }
@@ -341,54 +395,86 @@ createPage({
 .scan-c.bl { bottom: 0; left: 0; border-width: 0 0 4rpx 4rpx; border-radius: 0 0 0 4rpx; }
 .scan-c.br { bottom: 0; right: 0; border-width: 0 4rpx 4rpx 0; border-radius: 0 0 4rpx 0; }
 
-/* ========== 选项栅格 ========== */
+/* ========== 选项栅格：金属选择卡 ========== */
 .sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
 .sel-option {
   position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 8rpx;
   padding: 26rpx 12rpx;
-  border: 2rpx solid var(--color-border); border-radius: 16rpx;
-  background: var(--color-bg); text-align: center;
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel-2); text-align: center;
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
   transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 .sel-option:active { opacity: 0.85; }
+/* 选中态：橙色描边 + 左侧 LED 光条点亮 + 橙色 12% 底 */
 .sel-active {
-  border-color: var(--color-primary); background: rgba(0, 122, 255, 0.06);
-  box-shadow: 0 6rpx 18rpx rgba(0, 122, 255, 0.12);
+  border-color: var(--color-primary);
+  background: rgba(232, 115, 10, 0.12);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), 0 0 12rpx rgba(232, 115, 10, 0.25);
+}
+.sel-active::before {
+  content: '';
+  position: absolute; left: 0; top: 50%;
+  width: 6rpx; height: 56rpx; margin-top: -28rpx;
+  border-radius: 0 3rpx 3rpx 0;
+  background: var(--color-primary);
+  box-shadow: 0 0 10rpx var(--color-primary);
 }
 .sel-active .sel-name { color: var(--color-primary); }
+/* 选中角标：橙色金属贴片 */
 .sel-check {
   position: absolute; top: -2rpx; right: -2rpx;
-  width: 36rpx; height: 36rpx; border-radius: 0 14rpx 0 16rpx;
+  width: 36rpx; height: 36rpx; border-radius: 0 var(--radius-sm) 0 var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
   font-size: 22rpx; color: #fff;
-  background: var(--color-primary);
+  background: var(--grad-btn-primary);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: inset 1rpx 1rpx 0 rgba(255, 255, 255, 0.35);
 }
 .sel-name { font-size: 28rpx; font-weight: 600; color: var(--color-text); }
-.sel-desc { font-size: 22rpx; color: var(--color-text-secondary); }
+.sel-desc { font-size: 22rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
 
+/* ========== 进入按钮：橙色金属实体键 ========== */
 .confirm-btn {
   width: 100%; height: 96rpx; line-height: 96rpx; padding: 0;
-  margin-top: 32rpx; border: none; border-radius: 999rpx;
-  font-size: 32rpx; font-weight: 600; color: #fff; letter-spacing: 3rpx;
-  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
-  box-shadow: 0 12rpx 30rpx rgba(0, 122, 255, 0.32);
-  transition: transform .15s ease, opacity .15s ease;
+  margin-top: 32rpx;
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  border-radius: var(--radius);
+  font-size: 32rpx; font-weight: 700; color: #fff; letter-spacing: 3rpx;
+  background: var(--grad-btn-primary);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    0 8rpx 20rpx rgba(232, 115, 10, 0.35);
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
+  transition: transform .15s ease, opacity .15s ease, filter .15s ease;
 }
 .confirm-btn::after { border: none; }
-.confirm-btn:active { transform: scale(0.97); opacity: 0.92; }
+.confirm-btn:active { transform: scale(0.97) translateY(2rpx); filter: brightness(0.94); }
 
-/* ========== 连接记录 ========== */
+/* ========== 连接记录：铭牌标题 + 铆钉面板 ========== */
 .section-title {
   display: flex; align-items: center; justify-content: space-between;
   padding: 32rpx 8rpx 16rpx;
 }
 .title-left { display: flex; align-items: center; }
+/* 螺丝点：铆钉高光 + 暗影 */
 .title-bar {
-  width: 8rpx; height: 30rpx; border-radius: 4rpx; margin-right: 16rpx;
-  background: var(--color-primary);
+  width: 16rpx; height: 16rpx; border-radius: 50%; margin-right: 16rpx;
+  background: radial-gradient(circle at 35% 30%, var(--deco-rivet) 0 3rpx, var(--deco-rivet-shadow) 3.6rpx 5rpx, var(--color-border-strong) 5.6rpx 8rpx);
+  box-shadow: inset 0 0 2rpx rgba(0, 0, 0, 0.3), 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
 }
-.title-text { font-size: 30rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx; }
+.title-text { font-size: 28rpx; font-weight: 700; color: var(--color-text); letter-spacing: 3rpx; }
+/* 英文铭牌 */
+.title-plate {
+  margin-left: 12rpx;
+  font-family: 'DIN Alternate', 'Roboto Mono', 'SF Mono', Menlo, monospace;
+  font-size: 18rpx; font-weight: 700; letter-spacing: 2rpx;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+}
 .clear-btn { font-size: 24rpx; color: var(--color-text-secondary); padding: 8rpx 16rpx; }
 
 .history-empty {
@@ -396,47 +482,64 @@ createPage({
   padding: 72rpx 0 64rpx;
 }
 .empty-icon { position: relative; width: 72rpx; height: 72rpx; margin-bottom: 20rpx; }
-.empty-dot { background: var(--color-text-secondary); box-shadow: none; opacity: 0.5; }
+.empty-dot { background: var(--color-text-tertiary); box-shadow: none; opacity: 0.5; }
 .empty-w1 {
   width: 56rpx; height: 56rpx; margin: -28rpx 0 0 -28rpx;
-  border-color: var(--color-text-secondary); animation: none; opacity: 0.3;
+  border-color: var(--color-text-tertiary); animation: none; opacity: 0.3;
 }
-.empty-text { font-size: 26rpx; color: var(--color-text-secondary); }
+.empty-text { font-size: 26rpx; color: var(--color-text-secondary); letter-spacing: 2rpx; }
 
+/* 历史条目：金属面板 + 在线 LED */
 .history-item {
   display: flex; align-items: center; gap: 16rpx;
   margin: 0 0 16rpx 0; padding: 26rpx 24rpx;
-  border-radius: 24rpx;
-  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.05);
-  transition: transform .15s ease;
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-card);
+  transition: transform .15s ease, filter .15s ease;
 }
-.history-item:active { transform: scale(0.98); }
-.history-dot { width: 12rpx; height: 12rpx; border-radius: 50%; flex-shrink: 0; }
-.dot-on { background: var(--color-success); box-shadow: 0 0 10rpx rgba(52, 199, 89, 0.5); }
+.history-item:active { transform: scale(0.98); filter: brightness(0.96); }
+.history-dot {
+  width: 14rpx; height: 14rpx; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-track);
+  box-shadow: inset 0 0 4rpx rgba(0, 0, 0, 0.4);
+}
+.dot-on { background: var(--color-success); box-shadow: 0 0 10rpx var(--color-success); }
 .dot-off { background: var(--color-text-secondary); }
 .history-info { flex: 1; min-width: 0; }
 .history-top { display: flex; align-items: center; gap: 12rpx; }
 .history-name {
-  font-size: 28rpx; font-weight: 600; color: var(--color-text); font-family: 'SF Mono', Menlo, monospace;
+  font-size: 28rpx; font-weight: 600; color: var(--color-text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .history-tag {
-  flex-shrink: 0; font-size: 20rpx; color: var(--color-primary);
-  background: rgba(0, 122, 255, 0.10); padding: 3rpx 14rpx; border-radius: 999rpx;
+  flex-shrink: 0; font-size: 20rpx; font-weight: 600; letter-spacing: 1rpx;
+  color: var(--color-primary);
+  background: var(--color-fill);
+  border: 1rpx solid var(--color-border);
+  padding: 3rpx 14rpx; border-radius: 6rpx;
 }
 .history-time { font-size: 22rpx; color: var(--color-text-secondary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.history-arrow { font-size: 32rpx; color: var(--color-text-secondary); flex-shrink: 0; }
+.history-arrow { font-size: 32rpx; font-weight: 700; color: var(--color-text-tertiary); flex-shrink: 0; }
 
-/* ========== 深色模式补丁 ========== */
-.page.dark .hero { background: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%); }
-.page.dark .form-card { box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.45); }
-.page.dark .field-wrap { background: #2C2C2E; border-color: transparent; }
-.page.dark .field-wrap.focused { background: #2C2C2E; box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4); }
-.page.dark .sel-option { background: #2C2C2E; border-color: transparent; }
-.page.dark .sel-active { background: rgba(10, 132, 255, 0.14); border-color: var(--color-primary); }
-.page.dark .history-item { box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4); }
-.page.dark .history-tag { background: rgba(10, 132, 255, 0.16); }
-.page.dark .confirm-btn { background: linear-gradient(135deg, #1A7AFF, #0A84FF); box-shadow: 0 12rpx 30rpx rgba(0, 0, 0, 0.45); }
+/* ========== 暗档补丁：仅提亮橙色光效，面板/边框由变量自动切换 ========== */
+.page.dark .sel-active {
+  background: rgba(255, 138, 30, 0.14);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), 0 0 14rpx rgba(255, 138, 30, 0.3);
+}
+.page.dark .field-wrap.focused {
+  box-shadow: inset 2rpx 2rpx 6rpx var(--color-input-inset), 0 0 0 3rpx rgba(255, 138, 30, 0.22);
+}
+.page.dark .scan-btn {
+  box-shadow: inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3), inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25), 0 6rpx 16rpx rgba(255, 138, 30, 0.35);
+}
+.page.dark .confirm-btn {
+  box-shadow: inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3), inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25), 0 8rpx 20rpx rgba(255, 138, 30, 0.4);
+}
 </style>
 
 <script type="application/json">

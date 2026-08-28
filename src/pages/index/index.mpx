@@ -1,12 +1,9 @@
 <template>
-  <view class="page {{darkMode ? 'dark' : ''}}">
+  <view class="page {{themeClass}}">
     <!-- 顶部品牌区：让现场人员确认「我在哪个单位的系统里干活」 -->
     <!-- 全屏沉浸式头图：navigationStyle=custom 去掉了系统导航栏，
          这里用 heroTopOffset（状态栏+胶囊按钮等高区域）把内容整体下移，避免被胶囊遮住 -->
     <view class="hero anim-item d1" style="padding-top: calc(64rpx + {{heroTopOffset}}px)">
-      <view class="hero-deco deco-1"></view>
-      <view class="hero-deco deco-2"></view>
-      <view class="hero-deco deco-3"></view>
       <view class="brand">
         <view class="brand-main">
           <text class="brand-name">设备管理</text>
@@ -15,7 +12,7 @@
         <view class="brand-side">
           <!-- 主题开关收进头图右上角：圆形图标钮，不占单独一行 -->
           <view class="theme-btn" bindtap="toggleTheme">
-            <text class="theme-btn-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+            <text class="theme-btn-icon">{{themeIcon}}</text>
           </view>
           <view class="brand-tenant-pill" wx:if="{{isLogged && tenantName}}">
             <text class="brand-tenant">{{tenantName}}</text>
@@ -25,20 +22,20 @@
     </view>
 
     <!-- 账号卡：登录后显示身份与角色；未登录给登录入口 -->
-    <view class="card account anim-item d2" wx:if="{{isLogged}}">
+    <view class="card account riveted anim-item d2" wx:if="{{isLogged}}">
       <view class="avatar-ring">
         <view class="avatar">{{avatarText}}</view>
       </view>
       <view class="account-info">
         <text class="account-name">{{displayName}}</text>
         <view class="role-tags" wx:if="{{roleLabels.length}}">
-          <text class="role-tag" wx:for="{{roleLabels}}" wx:key="index">{{item}}</text>
+          <text class="role-tag tag" wx:for="{{roleLabels}}" wx:key="index">{{item}}</text>
         </view>
         <text class="account-username" wx:else>@{{username}}</text>
       </view>
       <text class="logout" bindtap="handleLogout">退出</text>
     </view>
-    <view class="card account guest anim-item d2" wx:else bindtap="goLogin">
+    <view class="card account guest riveted anim-item d2" wx:else bindtap="goLogin">
       <view class="avatar-ring guest-ring">
         <view class="avatar guest-avatar">?</view>
       </view>
@@ -99,7 +96,7 @@
           bindtap="selectDevice"
         >
           <view class="search-item-info">
-            <text class="search-item-sn">{{item.sn}}</text>
+            <text class="search-item-sn mono">{{item.sn}}</text>
             <text class="search-item-name" wx:if="{{item.name}}">{{item.name}}</text>
           </view>
           <text class="search-item-community" wx:if="{{item.community}}">{{item.community}}</text>
@@ -112,23 +109,7 @@
     </view>
 
     <!-- 功能网格：后续新功能往这里加卡片 -->
-    <view class="grid" wx:if="{{isLogged}}">
-      <view class="card func-card anim-item d5" bindtap="goMonitor">
-        <view class="func-icon monitor-icon">
-          <view class="signal-bars">
-            <view class="bar b1"></view>
-            <view class="bar b2"></view>
-            <view class="bar b3"></view>
-            <view class="bar b4"></view>
-          </view>
-        </view>
-        <view class="func-text">
-          <text class="func-title">设备监控</text>
-          <text class="func-desc">实时查看设备运行状态与数据</text>
-        </view>
-        <text class="func-arrow">›</text>
-      </view>
-    </view>
+    <!-- 设备监控功能已移至蓝牙调试页面，通过选择4G/WiFi模式进入 -->
   </view>
 </template>
 
@@ -198,7 +179,8 @@ createPage({
     roleLabels: [],
     canInstall: false,
     canDebug: false,
-    darkMode: false,
+    themeClass: '',
+    themeIcon: '☀️',
     searchValue: '',
     searchResults: [],
     searching: false,
@@ -221,14 +203,21 @@ createPage({
   },
 
   onShow() {
-    // 头图背景是蓝色，状态栏图标要用白色才看得清。从别的页面（用系统导航栏，
-    // 图标默认黑色）返回时状态栏颜色会被带黑，所以每次 onShow 都要重新设一遍。
-    wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#007AFF' })
+    // 头图是工业金属面板：浅档浅灰底配黑色状态栏图标、暗两档深底配白色图标（深黑档底色更深）。
+    // 从别的页面（用系统导航栏，图标默认黑色）返回时状态栏颜色会被带黑，
+    // 所以每次 onShow 都要重新设一遍。
+    const store = useDeviceStore()
+    const level = store.themeLevel
+    wx.setNavigationBarColor({
+      frontColor: level === 'light' ? '#000000' : '#ffffff',
+      backgroundColor: level === 'light' ? '#D7DBE1' : level === 'darker' ? '#1C1E23' : '#2A2D34',
+    })
 
     const auth = useAuthStore()
     const displayName = auth.user.realname || auth.user.username
     this.setData({
-      darkMode: useDeviceStore().darkMode,
+      themeClass: store.themeClass,
+      themeIcon: store.themeIcon,
       isLogged: auth.isLogged,
       username: auth.user.username,
       displayName,
@@ -255,7 +244,7 @@ createPage({
   toggleTheme() {
     const store = useDeviceStore()
     store.toggleDarkMode()
-    this.setData({ darkMode: store.darkMode })
+    this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
   },
 
   goLogin() {
@@ -426,16 +415,6 @@ createPage({
     this.setData({ searchValue: '', searchResults: [], searching: false })
     wx.navigateTo({ url: `/pages/device/detail?sn=${encodeURIComponent(sn)}` })
   },
-
-  /** 跳转到设备监控：先让用户搜索选择设备 */
-  goMonitor() {
-    wx.showModal({
-      title: '设备监控',
-      content: '请先通过扫码或搜索找到要监控的设备，然后在设备详情页进入监控功能。',
-      showCancel: false,
-      confirmText: '知道了',
-    })
-  },
 })
 </script>
 
@@ -454,62 +433,76 @@ createPage({
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ========== 品牌头图：iOS 蓝渐变 ========== */
+/* ========== 品牌头图：工业金属顶盖面板 ========== */
 .hero {
   position: relative; overflow: hidden;
   margin: 0 -24rpx; padding: 64rpx 40rpx 112rpx;
-  background: linear-gradient(160deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
-  border-radius: 0 0 48rpx 48rpx;
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-card);
 }
-.hero-deco { position: absolute; border-radius: 50%; pointer-events: none; }
-.deco-1 { width: 360rpx; height: 360rpx; top: -150rpx; right: -100rpx; background: rgba(255, 255, 255, 0.10); }
-.deco-2 { width: 200rpx; height: 200rpx; bottom: -70rpx; left: -50rpx; background: rgba(255, 255, 255, 0.07); }
-.deco-3 { width: 80rpx; height: 80rpx; top: 48rpx; left: 58%; background: rgba(255, 255, 255, 0.14); }
 .brand { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
 .brand-main { display: flex; flex-direction: column; }
 .brand-side { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
+/* 主题开关：金属圆形按钮 */
 .theme-btn {
   width: 64rpx; height: 64rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, 0.22); border: 1rpx solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(20rpx);
+  background: var(--color-fill);
+  border: 2rpx solid var(--color-border);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight), inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12);
   transition: transform .2s ease;
 }
 .theme-btn:active { transform: scale(0.88) rotate(-15deg); }
 .theme-btn-icon { font-size: 30rpx; line-height: 1; }
-.brand-name { font-size: 48rpx; font-weight: 700; color: #fff; letter-spacing: 2rpx; }
-.brand-sub { margin-top: 12rpx; font-size: 24rpx; color: rgba(255, 255, 255, 0.75); letter-spacing: 1rpx; }
+.brand-name { font-size: 48rpx; font-weight: 700; color: var(--color-text); letter-spacing: 2rpx; }
+.brand-sub { margin-top: 12rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
+/* 租户铭牌：小圆角金属牌 */
 .brand-tenant-pill {
-  max-width: 300rpx; margin-top: 16rpx; padding: 8rpx 24rpx; border-radius: 999rpx; flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.2); border: 1rpx solid rgba(255, 255, 255, 0.3);
+  max-width: 300rpx; margin-top: 16rpx; padding: 8rpx 24rpx; border-radius: var(--radius-sm); flex-shrink: 0;
+  background: var(--color-fill);
+  border: 2rpx solid var(--color-border);
 }
 .brand-tenant {
-  display: block; font-size: 22rpx; color: #fff; font-weight: 500;
+  display: block; font-size: 22rpx; color: var(--color-text-secondary); font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ========== 账号卡：悬浮叠层 ========== */
+/* ========== 账号卡：金属面板（面板质感由全局 .card + .riveted 提供，这里只管布局与叠层） ========== */
 .account {
   position: relative; z-index: 2;
   display: flex; align-items: center;
   margin: -72rpx 8rpx 0; padding: 32rpx 28rpx;
-  border-radius: 28rpx;
-  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.10);
 }
 .avatar-ring {
   width: 104rpx; height: 104rpx; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 122, 255, 0.08);
+  background: var(--color-fill);
+  border: 2rpx solid var(--color-border);
 }
+/* 头像：橙色金属圆盘 */
 .avatar {
   width: 88rpx; height: 88rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 38rpx; font-weight: 600; color: #fff;
-  background: linear-gradient(135deg, #4C9AFF, #007AFF);
-  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.35);
+  background: var(--grad-btn-primary);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    var(--shadow-card);
 }
-.guest-ring { background: var(--color-fill); }
-.guest-avatar { background: var(--color-text-tertiary); box-shadow: none; }
+/* 未登录：哑光灰盘，和登录态的橙盘一眼区分 */
+.guest-avatar {
+  color: var(--color-text-secondary);
+  background: var(--color-panel-3);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
+}
 .account-info { flex: 1; margin-left: 24rpx; overflow: hidden; }
 .account-name { display: block; font-size: 34rpx; font-weight: 600; color: var(--color-text); letter-spacing: 0.5rpx; }
 .account-username {
@@ -517,21 +510,24 @@ createPage({
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .role-tags { display: flex; flex-wrap: wrap; margin-top: 12rpx; }
-.role-tag {
-  margin-right: 12rpx; padding: 6rpx 20rpx; border-radius: 999rpx;
-  font-size: 20rpx; font-weight: 500; color: var(--color-primary);
-  background: rgba(0, 122, 255, 0.10);
-}
+/* 角色标签视觉走全局 .tag 铭牌，这里只留间距 */
+.role-tag { margin-right: 12rpx; }
 .logout { font-size: 26rpx; color: var(--color-danger); padding: 12rpx 8rpx 12rpx 24rpx; flex-shrink: 0; }
+/* 去登录：橙色金属键 */
 .login-btn {
-  flex-shrink: 0; padding: 14rpx 32rpx; border-radius: 999rpx;
-  background: var(--color-primary);
-  box-shadow: 0 6rpx 16rpx rgba(0, 122, 255, 0.3);
+  flex-shrink: 0; padding: 14rpx 32rpx;
+  border-radius: var(--radius);
+  background: var(--grad-btn-primary);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    var(--shadow-card);
 }
-.login-btn:active { opacity: 0.8; }
+.login-btn:active { filter: brightness(0.94); transform: translateY(2rpx); }
 .login-link { font-size: 26rpx; color: #fff; font-weight: 600; }
 
-/* ========== 扫码主操作：圆形缓动按钮 ========== */
+/* ========== 扫码主操作：橙色金属圆盘 ========== */
 .scan-wrap {
   display: flex; align-items: center; justify-content: center;
   padding: 64rpx 0 40rpx;
@@ -544,7 +540,7 @@ createPage({
 .scan-ring {
   position: absolute; top: 50%; left: 50%;
   border-radius: 50%;
-  border: 3rpx solid rgba(0, 122, 255, 0.45);
+  border: 3rpx solid var(--color-primary);
   animation: ringPulse 2.6s cubic-bezier(.25, .46, .45, .94) infinite;
 }
 .scan-ring.r1 { width: 280rpx; height: 280rpx; margin: -140rpx 0 0 -140rpx; }
@@ -553,14 +549,19 @@ createPage({
   0% { opacity: 0.8; transform: scale(0.82); }
   100% { opacity: 0; transform: scale(1.12); }
 }
+/* 主键：橙色金属圆盘 + groove 凹槽边 + 上沿高光 */
 .scan-disc {
   position: relative; width: 228rpx; height: 228rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #3D8BFF 0%, #007AFF 60%, #0060E0 100%);
-  box-shadow: 0 20rpx 48rpx rgba(0, 122, 255, 0.4), inset 0 2rpx 0 rgba(255, 255, 255, 0.35);
+  background: var(--grad-btn-primary);
+  border: 4rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    var(--shadow-card);
   transition: transform .18s ease, box-shadow .18s ease;
 }
-.scan-wrap:active .scan-disc { transform: scale(0.94); box-shadow: 0 12rpx 30rpx rgba(0, 122, 255, 0.3); }
+.scan-wrap:active .scan-disc { transform: scale(0.94) translateY(2rpx); filter: brightness(0.94); }
 .scan-icon { position: relative; width: 96rpx; height: 96rpx; }
 .scan-corner { position: absolute; width: 28rpx; height: 28rpx; border-color: #fff; border-style: solid; }
 .scan-corner.tl { top: 0; left: 0; border-width: 6rpx 0 0 6rpx; border-radius: 6rpx 0 0 0; }
@@ -580,22 +581,23 @@ createPage({
 
 /* ========== 功能网格 ========== */
 .grid { margin-top: 24rpx; }
-.func-card { padding: 32rpx 28rpx; border-radius: 28rpx; box-shadow: var(--shadow-card); }
+.func-card { padding: 32rpx 28rpx; border-radius: var(--radius-lg); box-shadow: var(--shadow-card); }
 .func-card:active { background: var(--color-fill); }
 .func-card { display: flex; align-items: center; position: relative; }
 .func { display: flex; align-items: center; padding: 32rpx 28rpx; position: relative; }
 .func:active { background: var(--color-fill); }
 .func.disabled .func-title, .func.disabled .func-desc { opacity: 0.45; }
 .func-icon {
-  position: relative; width: 80rpx; height: 80rpx; border-radius: 22rpx; flex-shrink: 0;
+  position: relative; width: 80rpx; height: 80rpx; border-radius: var(--radius); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 122, 255, 0.10);
+  background: var(--color-fill);
+  border: 2rpx solid var(--color-border);
 }
-.monitor-icon { background: rgba(52, 199, 89, 0.10); }
+.monitor-icon { background: var(--color-fill); }
 .signal-bars { display: flex; align-items: flex-end; gap: 6rpx; }
 .bar {
   width: 8rpx; border-radius: 4rpx 4rpx 0 0;
-  background: #34C759;
+  background: var(--color-success);
   animation: barPulse 1.6s ease-in-out infinite;
 }
 .bar.b1 { height: 16rpx; }
@@ -616,43 +618,37 @@ createPage({
 .func-arrow { font-size: 40rpx; color: var(--color-text-tertiary); padding-left: 16rpx; }
 .dark-badge { position: static; flex-shrink: 0; margin-left: 16rpx; }
 
-/* ========== 深色模式补丁 ========== */
-.page.dark .hero { background: linear-gradient(160deg, #0A5CFF 0%, #0A84FF 55%, #0040B0 100%); }
-.page.dark .account { box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, 0.5); }
-.page.dark .role-tag { background: rgba(10, 132, 255, 0.16); }
-.page.dark .func-icon { background: rgba(10, 132, 255, 0.16); }
-.page.dark .monitor-icon { background: rgba(52, 199, 89, 0.16); }
-.page.dark .scan-disc { box-shadow: 0 20rpx 48rpx rgba(0, 0, 0, 0.55), inset 0 2rpx 0 rgba(255, 255, 255, 0.25); }
-.page.dark .scan-ring { border-color: rgba(10, 132, 255, 0.5); }
-.page.dark .theme-btn { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.24); }
-.page.dark .search-box { background: var(--color-card); }
-.page.dark .search-results { background: var(--color-card); }
+/* 深色档无需补丁：所有面板/按钮/标签颜色均由语义变量在 .dark 下自动切换 */
 
-/* ========== 搜索区域：iOS 圆角搜索栏 ========== */
+/* ========== 搜索区域：内凹金属搜索槽 ========== */
 .search-section { margin-top: 4rpx; }
 .search-divider { display: flex; align-items: center; padding: 32rpx 0 24rpx; }
 .divider-line { flex: 1; height: 1rpx; background: var(--color-border); }
 .divider-text { margin: 0 24rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
+/* 搜索槽：内凹金属槽，聚焦时凹槽描边点亮工业橙 */
 .search-box {
   display: flex; align-items: center;
-  padding: 0 28rpx; border-radius: 999rpx;
-  background: var(--color-card); border: 2rpx solid transparent;
-  box-shadow: var(--shadow-card);
+  padding: 0 28rpx; border-radius: var(--radius);
+  background: var(--color-panel-2); border: 2rpx solid var(--color-border);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
   transition: border-color .2s ease, box-shadow .2s ease;
 }
-.search-box.focused {
-  border-color: var(--color-primary);
-  box-shadow: 0 6rpx 20rpx rgba(0, 122, 255, 0.15);
-}
+.search-box.focused { border-color: var(--color-primary); }
 .search-icon { font-size: 36rpx; color: var(--color-text-tertiary); margin-right: 14rpx; }
 .search-box.focused .search-icon { color: var(--color-primary); }
 .search-input { flex: 1; height: 88rpx; font-size: 28rpx; color: var(--color-text); }
 .search-placeholder { color: var(--color-text-tertiary); font-size: 26rpx; }
 .search-clear { padding: 12rpx; font-size: 36rpx; color: var(--color-text-tertiary); flex-shrink: 0; }
+/* 搜索结果：金属面板 */
 .search-results {
-  margin-top: 16rpx; border-radius: 24rpx; overflow: hidden;
-  background: var(--color-card);
-  box-shadow: var(--shadow-float);
+  margin-top: 16rpx; overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-float);
   max-height: 600rpx; overflow-y: auto;
 }
 .search-item {
@@ -663,7 +659,7 @@ createPage({
 .search-item:last-child { border-bottom: none; }
 .search-item:active { background: var(--color-fill); }
 .search-item-info { flex: 1; overflow: hidden; }
-.search-item-sn { display: block; font-size: 28rpx; font-weight: 600; color: var(--color-text); font-family: 'SF Mono', Menlo, monospace; }
+.search-item-sn { display: block; font-size: 28rpx; font-weight: 600; color: var(--color-text); }
 .search-item-name { display: block; margin-top: 4rpx; font-size: 24rpx; color: var(--color-text-secondary); }
 .search-item-community { font-size: 24rpx; color: var(--color-text-secondary); margin-right: 12rpx; }
 .search-item-arrow { font-size: 32rpx; color: var(--color-text-tertiary); }

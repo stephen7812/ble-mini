@@ -1,6 +1,6 @@
 <template>
   <view class="page">
-    <view class="scan-status {{isScanning ? 'scanning' : ''}}" bindtap="toggleScan">
+    <view class="scan-status riveted {{isScanning ? 'scanning' : ''}}" bindtap="toggleScan">
       <view class="radar">
         <view class="radar-ring r1"></view>
         <view class="radar-ring r2"></view>
@@ -20,13 +20,13 @@
       <text class="empty-text">未发现设备</text>
     </view>
 
-    <view wx:for="{{devices}}" wx:key="deviceId" class="card device-card mt-8" bindtap="selectDevice" data-device="{{item}}">
+    <view wx:for="{{devices}}" wx:key="deviceId" class="card riveted device-card mt-8" bindtap="selectDevice" data-device="{{item}}">
       <view class="dev-head">
         <view class="dev-avatar">
           <text class="dev-avatar-t">⌁</text>
         </view>
         <view class="dev-info">
-          <text class="device-name">{{item.localName || item.deviceId}}</text>
+          <text class="device-name mono">{{item.localName || item.deviceId}}</text>
           <view class="flex-row mt-4">
             <text class="tag {{item.valveType !== '未知设备' ? 'tag-success' : 'tag-warning'}}">{{item.valveType || '检测中...'}}</text>
             <text wx:if="{{item.manufacturer}}" class="tag tag-info ml-8">{{item.manufacturer}}</text>
@@ -36,7 +36,7 @@
           <view class="rssi-bars {{item.RSSI > -60 ? 's' : (item.RSSI > -80 ? 'm' : 'w')}}">
             <view class="bar b1"></view><view class="bar b2"></view><view class="bar b3"></view>
           </view>
-          <text class="rssi-text">{{item.RSSI}}dBm</text>
+          <text class="rssi-text mono">{{item.RSSI}}dBm</text>
         </view>
       </view>
       <view class="dev-arrow">›</view>
@@ -101,33 +101,91 @@ createPage({
 <style scoped>
 .page { padding: 24rpx; }
 
-/* ========== 雷达状态区 ========== */
+/* ========== 扫描状态面板：拉丝金属仪表面板（riveted 全局铆钉） ========== */
 .scan-status {
   display: flex; flex-direction: column; align-items: center;
-  padding: 56rpx 24rpx 48rpx; border-radius: 32rpx;
-  background: var(--color-card); box-shadow: var(--shadow-card);
+  padding: 56rpx 24rpx 48rpx;
+  border-radius: var(--radius-lg);
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-card);
   margin-top: 8rpx;
 }
-.radar { position: relative; width: 200rpx; height: 200rpx; margin-bottom: 32rpx; }
+.scan-status:active { filter: brightness(0.97); }
+
+/* ========== 取景框：金属边框 + 四角粗角标 ========== */
+.radar {
+  position: relative;
+  width: 224rpx; height: 224rpx; margin-bottom: 32rpx;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel-3);
+  border: 4rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow: inset 0 0 20rpx var(--color-input-inset);
+}
+.radar::before {
+  content: '';
+  position: absolute;
+  top: -12rpx; right: -12rpx; bottom: -12rpx; left: -12rpx;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--color-primary), var(--color-primary)) left top / 28rpx 8rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) left top / 8rpx 28rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) right top / 28rpx 8rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) right top / 8rpx 28rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) left bottom / 28rpx 8rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) left bottom / 8rpx 28rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) right bottom / 28rpx 8rpx,
+    linear-gradient(var(--color-primary), var(--color-primary)) right bottom / 8rpx 28rpx;
+  background-repeat: no-repeat;
+}
+.scanning .radar::before { animation: bracketPulse 1.8s ease-in-out infinite; }
+@keyframes bracketPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* 刻度环：内圈实线 + 外圈虚线分度 */
 .radar-ring {
   position: absolute; top: 50%; left: 50%; border-radius: 50%;
-  border: 3rpx solid rgba(0, 122, 255, 0.28);
+  border: 2rpx solid var(--color-border);
 }
-.radar-ring.r1 { width: 140rpx; height: 140rpx; margin: -70rpx 0 0 -70rpx; }
-.radar-ring.r2 { width: 200rpx; height: 200rpx; margin: -100rpx 0 0 -100rpx; }
+.radar-ring.r1 { width: 120rpx; height: 120rpx; margin: -60rpx 0 0 -60rpx; }
+.radar-ring.r2 {
+  width: 176rpx; height: 176rpx; margin: -88rpx 0 0 -88rpx;
+  border-style: dashed; border-color: var(--color-border-strong);
+}
+
+/* 中心指示灯：待机熄灭、扫描点亮橙色辉光 */
 .radar-core {
   position: absolute; top: 50%; left: 50%;
-  width: 28rpx; height: 28rpx; margin: -14rpx 0 0 -14rpx; border-radius: 50%;
-  background: linear-gradient(135deg, #4C9AFF, #007AFF);
-  box-shadow: 0 0 0 10rpx rgba(0, 122, 255, 0.15), 0 0 24rpx rgba(0, 122, 255, 0.6);
+  width: 24rpx; height: 24rpx; margin: -12rpx 0 0 -12rpx; border-radius: 50%;
+  background: var(--color-track);
+  box-shadow: inset 0 0 6rpx var(--color-input-inset);
 }
+.scanning .radar-core {
+  background: var(--color-primary);
+  box-shadow: 0 0 16rpx 2rpx var(--color-primary);
+}
+
+/* 扫描扇区：亮边在前、橙色辉光拖尾在后 */
 .radar-sweep {
   position: absolute; top: 50%; left: 50%;
-  width: 100rpx; height: 100rpx; margin: -50rpx 0 0 -50rpx; border-radius: 50%;
-  background: conic-gradient(from 0deg, rgba(0, 122, 255, 0.5), transparent 60deg);
+  width: 160rpx; height: 160rpx; margin: -80rpx 0 0 -80rpx; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 285deg, var(--color-primary) 360deg);
   opacity: 0; animation: none;
 }
-.scanning .radar-sweep { opacity: 1; animation: sweep 2.4s linear infinite; }
+.radar-sweep::before {
+  content: '';
+  position: absolute; left: 50%; top: 0;
+  width: 4rpx; height: 50%; margin-left: -2rpx;
+  border-radius: 2rpx;
+  background: var(--color-primary);
+  box-shadow: 0 0 12rpx 3rpx var(--color-primary);
+}
+.scanning .radar-sweep { opacity: 0.85; animation: sweep 2.4s linear infinite; }
 @keyframes sweep {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -136,36 +194,44 @@ createPage({
 .scanning .radar-ring.r2 { animation-delay: .4s; }
 @keyframes ringBreathe {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.25); opacity: 0.2; }
+  50% { transform: scale(1.1); opacity: 0.35; }
 }
-.status-text { font-size: 32rpx; font-weight: 600; color: var(--color-text); }
-.status-sub { margin-top: 12rpx; font-size: 24rpx; color: var(--color-text-secondary); }
+.status-text { font-size: 32rpx; font-weight: 600; color: var(--color-text); letter-spacing: 1rpx; }
+.status-sub { margin-top: 12rpx; font-size: 24rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
 
 .scan-toggle { margin-top: 32rpx; width: 100%; box-sizing: border-box; height: 96rpx; line-height: 96rpx; padding: 0; }
+.scan-toggle::after { border: none; }
 
-/* ========== 空态 ========== */
+/* ========== 空态：内凹金属槽 ========== */
 .empty { display: flex; flex-direction: column; align-items: center; margin-top: 72rpx; }
 .empty-icon {
   width: 128rpx; height: 128rpx; line-height: 128rpx; text-align: center;
-  border-radius: 50%; background: var(--color-fill);
+  border-radius: var(--radius);
+  background: var(--color-panel-3);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12);
   font-size: 64rpx; color: var(--color-text-tertiary); margin-bottom: 20rpx;
 }
-.empty-text { font-size: 26rpx; color: var(--color-text-secondary); }
+.empty-text { font-size: 26rpx; color: var(--color-text-secondary); letter-spacing: 1rpx; }
 
-/* ========== 设备卡片 ========== */
+/* ========== 设备卡片：铭牌面板（card / riveted 全局类） ========== */
 .device-card {
   display: flex; align-items: center;
-  padding: 28rpx; border-radius: 26rpx;
-  transition: transform .15s ease;
+  padding: 28rpx;
+  transition: transform .15s ease, filter .15s ease;
 }
-.device-card:active { transform: scale(0.98); }
+.device-card:active { transform: scale(0.98); filter: brightness(0.97); }
 .dev-head { flex: 1; display: flex; align-items: center; min-width: 0; }
 .dev-avatar {
-  width: 88rpx; height: 88rpx; border-radius: 22rpx; flex-shrink: 0;
+  width: 88rpx; height: 88rpx; border-radius: var(--radius-sm); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 122, 255, 0.10);
+  background: var(--color-fill);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
 }
-.dev-avatar-t { font-size: 48rpx; color: var(--color-primary); }
+.dev-avatar-t { font-size: 48rpx; color: var(--color-accent-2); }
 .dev-info { flex: 1; min-width: 0; margin-left: 22rpx; }
 .device-name {
   display: block; font-size: 30rpx; font-weight: 600; color: var(--color-text);
@@ -173,24 +239,22 @@ createPage({
 }
 .flex-row { display: flex; align-items: center; flex-wrap: wrap; margin-top: 10rpx; }
 .mt-4 { margin-top: 8rpx; }
-.tag-info { background: rgba(0, 122, 255, 0.10); color: #0A84FF; }
+.tag-info { background: var(--color-fill); color: var(--color-accent-2); }
 
+/* ========== 信号强度：LED 段式电平表 ========== */
 .rssi { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-left: 16rpx; }
 .rssi-bars { display: flex; align-items: flex-end; gap: 3rpx; height: 28rpx; }
-.rssi-bars .bar { width: 6rpx; border-radius: 2rpx; background: var(--color-text-tertiary); }
+.rssi-bars .bar { width: 6rpx; border-radius: 1rpx; background: var(--color-track); }
 .rssi-bars .bar.b1 { height: 10rpx; }
 .rssi-bars .bar.b2 { height: 18rpx; }
 .rssi-bars .bar.b3 { height: 26rpx; }
-.rssi-bars.s .bar { background: #34C759; }
-.rssi-bars.m .bar { background: #FF9500; }
-.rssi-bars.w .bar { background: #FF3B30; }
+.rssi-bars.s .bar { background: var(--color-success); box-shadow: 0 0 8rpx var(--color-success); }
+.rssi-bars.m .bar { background: var(--color-warning); box-shadow: 0 0 8rpx var(--color-warning); }
+.rssi-bars.w .bar { background: var(--color-danger); box-shadow: 0 0 8rpx var(--color-danger); }
 .rssi-text { margin-top: 8rpx; font-size: 20rpx; color: var(--color-text-secondary); }
 .dev-arrow { font-size: 44rpx; color: var(--color-text-tertiary); margin-left: 12rpx; flex-shrink: 0; }
 
-/* ========== 深色补丁 ========== */
-.page.dark .dev-avatar { background: rgba(10, 132, 255, 0.16); }
-.page.dark .radar-ring { border-color: rgba(10, 132, 255, 0.35); }
-.page.dark .radar-sweep { background: conic-gradient(from 0deg, rgba(10, 132, 255, 0.5), transparent 60deg); }
+/* ========== 暗档：本页全部取色走语义变量，根节点挂 .dark 即整体切换，无需局部补丁 ========== */
 </style>
 
 <script type="application/json">

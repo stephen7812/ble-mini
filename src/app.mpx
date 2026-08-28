@@ -18,27 +18,82 @@ createApp({
 </script>
 
 <style>
-/* ============ Apple Design · Light ============ */
-page {
-  --color-primary: #007AFF;
-  --color-success: #34C759;
-  --color-warning: #FF9500;
-  --color-danger: #FF3B30;
-  --color-bg: #F2F2F7;
-  --color-bg-secondary: #E5E5EA;
-  --color-card: #FFFFFF;
-  --color-text: #1C1C1E;
-  --color-text-secondary: #8E8E93;
-  --color-text-tertiary: #C7C7CC;
-  --color-border: #E5E5EA;
-  --color-fill: rgba(120, 120, 128, 0.12);
-  --color-fill-strong: rgba(120, 120, 128, 0.2);
-  --radius-lg: 28rpx;
-  --radius: 20rpx;
-  --radius-sm: 12rpx;
-  --shadow-card: 0 4rpx 24rpx rgba(0, 0, 0, 0.05);
-  --shadow-float: 0 12rpx 40rpx rgba(0, 0, 0, 0.10);
-  background: var(--color-bg);
+/* ============================================================
+   多主题架构 · 语义变量层
+   ------------------------------------------------------------
+   分两层设计，保证后续新增主题（苹果风/HUD/暖通……）时页面零改动：
+
+   1) 语义变量层（本文件定义，页面【只允许】消费这些变量）：
+      --color-*      语义色（主色/面板/文字/边框……）
+      --grad-*       渐变（面板/主按钮/描边按钮）
+      --deco-*       装饰（铆钉高光/暗影；非金属主题可置 transparent 隐藏）
+      --panel-border-style  面板边框样式（工业 groove / 其他主题 solid）
+      --bg-texture   页面背景纹理（多背景图层）
+      --radius-* / --shadow-*
+
+   2) 主题挂载层（按 class 切换）：
+      .theme-<name>           该主题的浅色档
+      .theme-<name>.dark      该主题的深色档
+      页面根节点：class="theme-{{theme}} {{darkMode ? 'dark' : ''}}"
+      theme 来自 store（当前默认 industrial，见 stores/device.js）。
+
+   兼容回退：page 与裸 .dark 选择器内置工业风默认值，
+   未挂 theme class 的旧页面依然正确显示。
+
+   新增主题三步：
+   a) 复制一份 .theme-industrial / .theme-industrial.dark 变量块并改名；
+   b) 只改变量值，不碰组件类（.card/.btn-primary 等全部由变量驱动）；
+   c) store 里加主题名 + 页面根节点绑定 theme-{{theme}}。
+   ============================================================ */
+
+/* ============ 默认主题：工业机械风 · 浅档 ============ */
+page,
+.theme-industrial {
+  /* ---- 语义色 ---- */
+  --color-primary: #E8730A;          /* 工业橙 */
+  --color-success: #1F9D55;
+  --color-warning: #D6830A;
+  --color-danger: #D8392B;
+  --color-accent-2: #6E7680;         /* 钢灰辅色（信息类中性色） */
+  --color-bg: #D7DBE1;               /* 银铝拉丝墙面 */
+  --color-bg-secondary: #C6CCD4;
+  --color-card: #E6E9EE;             /* 卡片基色（实际渲染走 --grad-panel） */
+  --color-text: #20242B;
+  --color-text-secondary: #5B616B;
+  --color-text-tertiary: #9BA1AB;
+  --color-border: #A9AFB8;
+  --color-border-strong: #8B919B;
+  --color-fill: rgba(32, 36, 43, 0.08);
+  --color-fill-strong: rgba(32, 36, 43, 0.14);
+  --color-panel-2: #DFE3E9;          /* 亮面板 */
+  --color-panel-3: #C9CFD7;          /* 暗面板 */
+  --color-highlight: rgba(255, 255, 255, 0.5);   /* 金属上沿高光 */
+  --color-input-inset: rgba(0, 0, 0, 0.10);      /* 输入框内凹暗影 */
+  --color-track: rgba(32, 36, 43, 0.16);         /* 轨道/未点亮底 */
+
+  /* ---- 渐变 ---- */
+  --grad-panel: linear-gradient(145deg, #EEF1F5 0%, #D6DBE2 55%, #C6CCD4 100%);
+  --grad-btn-primary: linear-gradient(145deg, #F08A2E 0%, #E8730A 60%, #C96208 100%);
+  --grad-btn-outline: linear-gradient(145deg, #DFE3E9 0%, #C9CFD7 100%);
+
+  /* ---- 装饰 ---- */
+  --deco-rivet: #F3F5F8;             /* 铆钉高光 */
+  --deco-rivet-shadow: #8A9099;      /* 铆钉暗影 */
+  --panel-border-style: groove;      /* 工业凹槽边框 */
+
+  /* ---- 形状与阴影 ---- */
+  --radius-lg: 20rpx;
+  --radius: 14rpx;
+  --radius-sm: 10rpx;
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.12);
+  --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.20);
+
+  /* ---- 页面背景：银色渐变金属（无纹理）---- */
+  --bg-texture:
+    linear-gradient(180deg, #E6E9EE 0%, #D5DAE1 32%, #CBD1D8 58%, #D4D9DF 82%, #DFE3E9 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
   font-size: 28rpx;
   line-height: 1.45;
   color: var(--color-text);
@@ -46,15 +101,163 @@ page {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- 卡片：iOS 分组列表风 ---------- */
+/* ============ 默认主题：工业机械风 · 暗档（枪灰渐变金属）============
+   根类统一用 .dark：无论页面根是 .page / .control-container
+   还是 .monitor-container / .app，挂上 dark 即换暗档。 */
+.dark,
+.theme-industrial.dark {
+  --color-primary: #FF8A1E;          /* 琥珀橙（发光） */
+  --color-success: #3DDC84;
+  --color-warning: #FFB020;
+  --color-danger: #FF453A;
+  --color-accent-2: #8E959F;         /* 钢灰辅色（暗档） */
+  --color-bg: #2A2D34;
+  --color-bg-secondary: #23262C;
+  --color-card: #2E323A;
+  --color-text: #E7E9ED;
+  --color-text-secondary: #9AA0AA;
+  --color-text-tertiary: #5E6470;
+  --color-border: #565A64;
+  --color-border-strong: #3A3E47;
+  --color-fill: rgba(255, 255, 255, 0.07);
+  --color-fill-strong: rgba(255, 255, 255, 0.13);
+  --color-panel-2: #2E323A;
+  --color-panel-3: #23262C;
+  --color-highlight: rgba(255, 255, 255, 0.10);
+  --color-input-inset: rgba(0, 0, 0, 0.35);
+  --color-track: #30343D;
+
+  --grad-panel: linear-gradient(145deg, #34383F 0%, #262A30 60%, #1F2227 100%);
+  --grad-btn-primary: linear-gradient(145deg, #FF9F42 0%, #FF8A1E 60%, #D97316 100%);
+  --grad-btn-outline: linear-gradient(145deg, #2E323A 0%, #23262C 100%);
+
+  --deco-rivet: #7A7E88;
+  --deco-rivet-shadow: #141619;
+
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.4);
+  --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.55);
+
+  --bg-texture:
+    linear-gradient(180deg, #3A3E46 0%, #2C2F36 32%, #23262C 58%, #2B2E35 82%, #34383F 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 默认主题：工业机械风 · 深黑档（枪灰渐变再压深一级）============
+   页面根节点同时挂 dark + darker 两个 class：dark 打底（局部 .dark 补丁
+   继续生效），darker 在其后覆盖变量。也可单独挂 .theme-industrial.darker。 */
+.darker,
+.theme-industrial.darker {
+  --color-primary: #FF8A1E;             /* 琥珀橙：深底上更醒目 */
+  --color-success: #3DDC84;
+  --color-warning: #FFB020;
+  --color-danger: #FF453A;
+  --color-accent-2: #7A8089;            /* 钢灰辅色：随底色压暗 */
+
+  --color-bg: #1C1E23;                  /* 页面底：近黑枪灰 */
+  --color-bg-secondary: #16181C;
+  --color-card: #212429;
+
+  --color-text: #E7E9ED;                /* 主文字保持高对比 */
+  --color-text-secondary: #8F95A0;
+  --color-text-tertiary: #565B65;
+
+  --color-border: #4A4E57;
+  --color-border-strong: #33373E;
+  --color-fill: rgba(255, 255, 255, 0.06);
+  --color-fill-strong: rgba(255, 255, 255, 0.11);
+
+  --color-panel-2: #212429;             /* 亮面板 */
+  --color-panel-3: #17191E;             /* 暗面板：终端屏更沉 */
+  --color-highlight: rgba(255, 255, 255, 0.08);   /* 上沿高光再收敛 */
+  --color-input-inset: rgba(0, 0, 0, 0.45);       /* 内凹暗影再加深 */
+  --color-track: #26292F;               /* 轨道/LED 熄灭态 */
+
+  --grad-panel: linear-gradient(145deg, #262A30 0%, #1B1E23 60%, #15171B 100%);
+  --grad-btn-primary: linear-gradient(145deg, #FF9F42 0%, #FF8A1E 60%, #D97316 100%);
+  --grad-btn-outline: linear-gradient(145deg, #212429 0%, #17191E 100%);
+
+  --deco-rivet: #6E727B;                /* 铆钉：哑光更沉 */
+  --deco-rivet-shadow: #0C0D10;
+
+  --shadow-card: 0 4rpx 16rpx rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 12rpx 32rpx rgba(0, 0, 0, 0.65);
+
+  /* 背景：枪灰渐变的深黑版（同构渐变：亮→暗→亮，色阶整体 -1 级） */
+  --bg-texture:
+    linear-gradient(180deg, #26292F 0%, #1B1E23 32%, #16181C 58%, #1A1D22 82%, #22252B 100%);
+
+  background-color: var(--color-bg);
+  background-image: var(--bg-texture);
+}
+
+/* ============ 以下组件类全部只消费语义变量（多主题兼容核心）============ */
+
+/* ---------- 数字读数：DIN 数码管风格 ---------- */
+.mono,
+.num {
+  font-family: 'DIN Alternate', 'Roboto Mono', 'SF Mono', Menlo, monospace;
+  letter-spacing: 1rpx;
+}
+
+/* ---------- 面板：金属渐变 + groove 边框 ---------- */
 .card {
-  background: var(--color-card);
+  position: relative;
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
   border-radius: var(--radius-lg);
   padding: 32rpx;
   margin: 24rpx 24rpx 0;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-card);
 }
-.card:active { }
+
+/* ---------- 铆钉角标：四角螺丝（挂在面板上；非金属主题变量置透明即隐藏）---------- */
+.riveted { position: relative; }
+.riveted::before,
+.riveted::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-repeat: no-repeat;
+  z-index: 1;
+}
+.riveted::before {
+  background-image:
+    radial-gradient(circle at 14rpx 14rpx, var(--deco-rivet) 0 4rpx, var(--deco-rivet-shadow) 4.6rpx 6rpx, transparent 7rpx),
+    radial-gradient(circle at calc(100% - 14rpx) 14rpx, var(--deco-rivet) 0 4rpx, var(--deco-rivet-shadow) 4.6rpx 6rpx, transparent 7rpx);
+}
+.riveted::after {
+  background-image:
+    radial-gradient(circle at 14rpx calc(100% - 14rpx), var(--deco-rivet) 0 4rpx, var(--deco-rivet-shadow) 4.6rpx 6rpx, transparent 7rpx),
+    radial-gradient(circle at calc(100% - 14rpx) calc(100% - 14rpx), var(--deco-rivet) 0 4rpx, var(--deco-rivet-shadow) 4.6rpx 6rpx, transparent 7rpx);
+}
+
+/* ---------- LED 指示灯 ---------- */
+.led {
+  width: 14rpx; height: 14rpx; border-radius: 50%;
+  background: var(--color-track);
+  box-shadow: inset 0 0 4rpx rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+.led.on { background: var(--color-success); box-shadow: 0 0 10rpx var(--color-success); }
+.led.warn { background: var(--color-warning); box-shadow: 0 0 10rpx var(--color-warning); }
+.led.err  { background: var(--color-danger);  box-shadow: 0 0 10rpx var(--color-danger); }
+.led.accent { background: var(--color-primary); box-shadow: 0 0 10rpx var(--color-primary); }
+
+/* ---------- 章节标题：工业铭牌风 ---------- */
+.section-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
 
 /* ---------- 布局与排版 ---------- */
 .flex-center { display: flex; align-items: center; justify-content: center; }
@@ -71,92 +274,168 @@ page {
 .mb-8 { margin-bottom: 16rpx; }
 .ml-8 { margin-left: 16rpx; }
 
-/* ---------- 按钮：iOS 圆角胶囊 ---------- */
+/* ---------- 按钮：金属实体键 ---------- */
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--grad-btn-primary);
   color: #fff;
-  border-radius: 999rpx;
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  border-radius: var(--radius);
   padding: 24rpx 48rpx;
   text-align: center;
   font-size: 30rpx;
-  font-weight: 600;
-  letter-spacing: 1rpx;
-  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.25);
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
 }
-.btn-primary:active { opacity: 0.75; transform: scale(0.98); }
+.btn-primary:active { opacity: 0.9; transform: scale(0.98) translateY(2rpx); filter: brightness(0.94); }
 .btn-outline {
-  border: none;
-  background: var(--color-fill);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  background: var(--grad-btn-outline);
   color: var(--color-primary);
-  border-radius: 999rpx;
+  border-radius: var(--radius);
   padding: 22rpx 48rpx;
   text-align: center;
   font-size: 30rpx;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12);
 }
-.btn-outline:active { background: var(--color-fill-strong); }
+.btn-outline:active { filter: brightness(0.95); transform: translateY(2rpx); }
 
-/* ---------- 标签：iOS 柔和填充 ---------- */
+/* ---------- 标签：工业铭牌小卡 ---------- */
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 6rpx 20rpx;
-  border-radius: 999rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
   font-size: 22rpx;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  border: 1rpx solid var(--color-border);
+  background: var(--color-panel-2);
+  color: var(--color-text-secondary);
 }
-.tag-success { background: rgba(52, 199, 89, 0.12); color: #34C759; }
-.tag-warning { background: rgba(255, 149, 0, 0.12); color: #FF9500; }
-.tag-error { background: rgba(255, 59, 48, 0.12); color: #FF3B30; }
+.tag-success { background: rgba(31, 157, 85, 0.12); color: var(--color-success); border-color: rgba(31, 157, 85, 0.4); }
+.tag-warning { background: rgba(214, 131, 10, 0.12); color: var(--color-warning); border-color: rgba(214, 131, 10, 0.4); }
+.tag-error   { background: rgba(216, 57, 43, 0.12); color: var(--color-danger); border-color: rgba(216, 57, 43, 0.4); }
 
-/* ============ Apple Design · Dark ============ */
-.page.dark {
-  --color-primary: #0A84FF;
-  --color-success: #30D158;
-  --color-warning: #FF9F0A;
-  --color-danger: #FF453A;
-  --color-bg: #000000;
-  --color-bg-secondary: #1C1C1E;
-  --color-card: #1C1C1E;
-  --color-text: #F2F2F7;
-  --color-text-secondary: #98989F;
-  --color-text-tertiary: #48484A;
-  --color-border: #38383A;
-  --color-fill: rgba(120, 120, 128, 0.2);
-  --color-fill-strong: rgba(120, 120, 128, 0.32);
-  --shadow-card: 0 4rpx 24rpx rgba(0, 0, 0, 0.4);
-  background: var(--color-bg);
+/* ---------- 输入框：内凹金属槽 ---------- */
+.field-input {
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
 }
-.page.dark .card { background: var(--color-card); border: 1rpx solid rgba(255, 255, 255, 0.04); }
-.page.dark .btn-primary { background: var(--color-primary); color: #fff; box-shadow: 0 8rpx 20rpx rgba(10, 132, 255, 0.3); }
-.page.dark .btn-outline { background: var(--color-fill); color: var(--color-primary); }
-.page.dark .field-input { background: #2C2C2E; border-color: transparent; color: var(--color-text); }
-.page.dark .sel-option { background: #2C2C2E; border-color: transparent; }
-.page.dark .sel-active { background: rgba(10, 132, 255, 0.15); border-color: var(--color-primary); }
-.page.dark .history-item { background: var(--color-card); }
-.page.dark .history-item:active { background: #2C2C2E; }
-.page.dark .history-tag { background: rgba(10, 132, 255, 0.15); color: var(--color-primary); }
-.page.dark .btn-cmd { border-color: var(--color-border); background: #2C2C2E; }
-.page.dark .btn-cmd:active { background: #3A3A3C; }
-.page.dark .btn-send { border-color: var(--color-primary); }
-.page.dark .btn-send:active { background: rgba(10, 132, 255, 0.15); }
-.page.dark .status-tag.on { background: rgba(48, 209, 88, 0.15); color: var(--color-success); }
-.page.dark .status-tag.off { background: #2C2C2E; color: var(--color-text-secondary); }
-.page.dark .data-item { background: #2C2C2E; }
-.page.dark .log-item { border-color: var(--color-border); }
-.page.dark .param-input,
-.page.dark .param-input-sm { background: #2C2C2E; border-color: transparent; color: var(--color-text); }
-.page.dark .log-hex,
-.page.dark .cmd-hex { color: #636366; }
-.page.dark .btn-cmd-full { background: rgba(48, 209, 88, 0.12); border-color: transparent; }
-.page.dark .btn-cmd-close { background: rgba(255, 69, 58, 0.12); border-color: transparent; }
-.page.dark .btn-cmd-primary { border-color: var(--color-primary); }
-.page.dark .btn-cmd-primary .cmd-name { color: var(--color-primary); }
-.page.dark .tag-success { background: rgba(48, 209, 88, 0.15); color: var(--color-success); }
-.page.dark .tag-warning { background: rgba(255, 159, 10, 0.15); color: var(--color-warning); }
-.page.dark .tag-error { background: rgba(255, 69, 58, 0.15); color: var(--color-danger); }
-.page.dark .text-success { color: var(--color-success); }
-.page.dark .section-title { color: var(--color-text-secondary); }
+.field-input:focus,
+.field-input.field-focus { border-color: var(--color-primary); }
+
+/* ---------- 选项按钮（蓝牙调试等页的选择卡）---------- */
+.sel-option {
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 2rpx 2rpx 0 var(--color-highlight);
+}
+.sel-active {
+  background: var(--color-fill);
+  border-color: var(--color-primary);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    0 0 0 2rpx var(--color-fill);
+}
+
+/* ---------- 历史记录条 ---------- */
+.history-item {
+  background: var(--color-panel-2);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 1rpx 1rpx 0 var(--color-highlight);
+}
+.history-item:active { filter: brightness(0.96); }
+.history-tag {
+  background: var(--color-fill);
+  color: var(--color-primary);
+  border: 1rpx solid var(--color-border);
+  border-radius: 6rpx;
+}
+
+/* ---------- 命令按钮（控制页）---------- */
+.btn-cmd {
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.1);
+}
+.btn-cmd:active { filter: brightness(0.94); transform: translateY(2rpx); }
+.btn-send { border-color: var(--color-primary); }
+.btn-send:active { background: var(--color-fill); }
+
+/* ---------- 状态铭牌 ---------- */
+.status-tag {
+  border-radius: 6rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+.status-tag.on {
+  background: rgba(31, 157, 85, 0.12);
+  color: var(--color-success);
+  border: 1rpx solid rgba(31, 157, 85, 0.4);
+}
+.status-tag.off {
+  background: var(--color-panel-3);
+  color: var(--color-text-secondary);
+  border: 1rpx solid var(--color-border);
+}
+
+/* ---------- 数据格 ---------- */
+.data-item {
+  background: var(--color-panel-2);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 1rpx 1rpx 0 var(--color-highlight);
+}
+
+/* ---------- 日志条 ---------- */
+.log-item { border: 1rpx solid var(--color-border); border-radius: var(--radius-sm); }
+
+/* ---------- 参数输入（控制页）---------- */
+.param-input,
+.param-input-sm {
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
+}
+.param-input:focus,
+.param-input-sm:focus { border-color: var(--color-primary); }
+
+/* ---------- 十六进制字节 ---------- */
+.log-hex,
+.cmd-hex { color: var(--color-text-tertiary); font-family: 'SF Mono', Menlo, monospace; }
+
+/* ---------- 命令特殊按钮 ---------- */
+.btn-cmd-full {
+  background: rgba(31, 157, 85, 0.10);
+  border: 1rpx solid rgba(31, 157, 85, 0.4);
+  border-radius: var(--radius-sm);
+}
+.btn-cmd-close {
+  background: rgba(216, 57, 43, 0.10);
+  border: 1rpx solid rgba(216, 57, 43, 0.4);
+  border-radius: var(--radius-sm);
+}
+.btn-cmd-primary { border-color: var(--color-primary); }
+.btn-cmd-primary .cmd-name { color: var(--color-primary); }
 </style>
 
 <script type="application/json">
@@ -176,7 +455,7 @@ page {
   ],
   "window": {
     "navigationBarTitleText": "正丰智能阀门",
-    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarBackgroundColor": "#D7DBE1",
     "navigationBarTextStyle": "black"
   }
 }

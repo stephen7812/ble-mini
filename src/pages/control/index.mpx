@@ -1,22 +1,25 @@
 <template>
-  <view class="control-container {{darkMode ? 'dark' : ''}}">
-    <!-- Hero 头部：设备信息与快捷入口 -->
-    <view class="hero-section anim-fade-in">
+  <view class="control-container {{themeClass}}">
+    <!-- Hero 头部：金属铭牌面板（设备信息与快捷入口） -->
+    <view class="hero-section riveted anim-fade-in">
       <view class="hero-deco deco-1"></view>
       <view class="hero-deco deco-2"></view>
 
       <view class="hero-content">
         <view class="device-header">
           <view class="device-info">
-            <text class="device-name">{{ deviceName }}</text>
-            <text class="device-sn">SN: {{ deviceSn }}</text>
+            <view class="device-name-row">
+              <view class="led on device-led"></view>
+              <text class="device-name">{{ deviceName }}</text>
+            </view>
+            <text class="device-sn mono">SN: {{ deviceSn }}</text>
             <view class="device-meta" wx:if="{{ platformName }}">
               <text class="platform-badge">{{ platformName }}</text>
             </view>
           </view>
           <view class="header-actions">
             <view class="theme-switch" bindtap="toggleTheme">
-              <text class="theme-icon">{{darkMode ? '🌙' : '☀️'}}</text>
+              <text class="theme-icon">{{themeIcon}}</text>
             </view>
             <view class="history-btn" bindtap="goHistory">
               <text class="history-icon">⧉</text>
@@ -48,12 +51,14 @@
       <!-- 控制命令列表 -->
       <view class="control-list anim-slide-up d1" wx:if="{{ !loadingCommands && availableCommands.length > 0 }}">
         <view class="section-header">
-          <view class="header-accent"></view>
+          <view class="header-screw"></view>
           <text class="section-title">远程控制</text>
+          <text class="header-plate mono">CMD</text>
         </view>
 
-        <!-- 动态渲染每个命令卡片：参考蓝牙控制页 pf-field 卡片风格 -->
-        <view class="command-card" wx:for="{{ availableCommands }}" wx:for-item="cmdItem" wx:key="command">
+        <!-- 动态渲染每个命令卡片：铆钉金属卡 + 左侧 LED 竖条 -->
+        <view class="command-card riveted" wx:for="{{ availableCommands }}" wx:for-item="cmdItem" wx:key="command">
+          <view class="cmd-led"></view>
           <text class="command-title">{{ cmdItem.name }}</text>
           <text class="command-desc" wx:if="{{ cmdItem.description }}">{{ cmdItem.description }}</text>
 
@@ -66,6 +71,7 @@
           <!-- 分时压力：独立 UI（总开关 + 5 个时段） -->
           <block wx:if="{{ cmdItem.command === 'setTimePressure' }}">
             <view class="tp-main-row">
+              <view class="led {{ timePressure.enable ? 'on' : '' }}"></view>
               <text class="tp-main-label">分时压力总开关</text>
               <switch class="tp-main-switch" checked="{{ timePressure.enable }}" data-command="{{ cmdItem.command }}" bindchange="onTimePressureEnableToggle" />
             </view>
@@ -73,6 +79,7 @@
             <view class="tp-slots">
               <view class="tp-slot {{ !timePressure.enable ? 'tp-disabled' : '' }}" wx:for="{{ timePressure.slots }}" wx:for-item="slot" wx:key="id">
                 <view class="tp-slot-head">
+                  <view class="led {{ slot.on ? 'on' : '' }}"></view>
                   <text class="tp-slot-title">时段{{ slot.id }}</text>
                   <switch class="tp-slot-switch" checked="{{ slot.on }}" data-idx="{{ index }}" data-command="{{ cmdItem.command }}" bindchange="onTimePressureSlotToggle" />
                 </view>
@@ -86,11 +93,11 @@
                     bindchange="onTimePressureTime"
                     disabled="{{ !slot.on || !timePressure.enable }}"
                   >
-                    <view class="tp-time-val {{ !slot.on || !timePressure.enable ? 'tp-off' : '' }}">{{ slot.time }}</view>
+                    <view class="tp-time-val mono {{ !slot.on || !timePressure.enable ? 'tp-off' : '' }}">{{ slot.time }}</view>
                   </picker>
                   <view class="tp-pressure-wrap">
                     <input
-                      class="tp-pressure-input"
+                      class="tp-pressure-input mono"
                       type="digit"
                       value="{{ slot.pressure }}"
                       data-idx="{{ index }}"
@@ -125,7 +132,7 @@
                   bindchange="handleParamPick"
                 >
                   <view class="picker-display">
-                    <text class="picker-value">{{ param.optionLabel }}</text>
+                    <text class="picker-value mono">{{ param.optionLabel }}</text>
                     <text class="picker-arrow">⌄</text>
                   </view>
                 </picker>
@@ -142,7 +149,7 @@
                   bindchange="handleParamDatePick"
                 >
                   <view class="picker-display">
-                    <text class="picker-value">{{ param.value }}</text>
+                    <text class="picker-value mono">{{ param.value }}</text>
                     <text class="picker-arrow">⌄</text>
                   </view>
                 </picker>
@@ -150,7 +157,7 @@
                 <!-- 普通输入 -->
                 <input
                   wx:else
-                  class="param-input"
+                  class="param-input mono"
                   type="{{ param.widgetType === 'number' ? 'digit' : 'text' }}"
                   data-command="{{ cmdItem.command }}"
                   data-param="{{ param.key }}"
@@ -217,8 +224,9 @@ createPage({
         { id: 5, on: false, time: '00:00', pressure: '' }
       ]
     },
-    // 深色模式
-    darkMode: false
+    // 主题（三档：light / dark / darker）
+    themeClass: '',
+    themeIcon: '☀️'
   },
 
   onLoad(options) {
@@ -240,9 +248,9 @@ createPage({
   },
 
   onShow() {
-    // 恢复深色模式状态，保持与实时监控页一致
+    // 恢复主题状态，保持与实时监控页一致
     const store = useDeviceStore()
-    this.setData({ darkMode: store.darkMode })
+    this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
   },
 
   methods: {
@@ -622,11 +630,11 @@ createPage({
       })
     },
 
-    // 切换深色模式
+    // 切换主题（三档循环）
     toggleTheme() {
       const store = useDeviceStore()
       store.toggleDarkMode()
-      this.setData({ darkMode: store.darkMode })
+      this.setData({ themeClass: store.themeClass, themeIcon: store.themeIcon })
     },
 
     // 解析设备类别：优先 product_category，缺失时用 valve_type 兜底
@@ -762,50 +770,13 @@ createPage({
 </script>
 
 <style scoped>
-/* ==================== 颜色系统与主题变量 ==================== */
+/* ==================== 工业机械风 · 远程阀门控制页 ====================
+   取色只走 app.mpx 语义变量（--color-* / --grad-* / --deco-*），本页不硬编码主题色；
+   明档随 page 主题、暗档随根节点 .dark class 自动切换，局部暗档补丁见文末。 */
 .control-container {
-  --bg-primary: #F2F2F7;
-  --bg-secondary: #FFFFFF;
-  --bg-hero: linear-gradient(150deg, #4C9AFF 0%, #007AFF 55%, #0055D4 100%);
-
-  --text-primary: #1C1C1E;
-  --text-secondary: #8E8E93;
-  --text-tertiary: #C7C7CC;
-
-  --accent-primary: #007AFF;
-  --accent-success: #34C759;
-  --accent-warning: #FF9500;
-  --accent-danger: #FF3B30;
-
-  --shadow-card: 0 4rpx 20rpx rgba(0, 0, 0, 0.06);
-  --shadow-float: 0 8rpx 30rpx rgba(0, 0, 0, 0.12);
-
-  --radius-sm: 12rpx;
-  --radius-md: 20rpx;
-  --radius-lg: 28rpx;
-
   min-height: 100vh;
-  background: var(--bg-primary);
   padding-bottom: 40rpx;
-}
-
-/* 深色模式主题 */
-.control-container.dark {
-  --bg-primary: #000000;
-  --bg-secondary: #1C1C1E;
-  --bg-hero: linear-gradient(150deg, #0A5CFF 0%, #0A84FF 60%, #0040B0 100%);
-
-  --text-primary: #F2F2F7;
-  --text-secondary: #98989F;
-  --text-tertiary: #636366;
-
-  --accent-primary: #0A84FF;
-  --accent-success: #30D158;
-  --accent-warning: #FF9F0A;
-  --accent-danger: #FF453A;
-
-  --shadow-card: 0 4rpx 20rpx rgba(0, 0, 0, 0.4);
-  --shadow-float: 0 8rpx 30rpx rgba(0, 0, 0, 0.6);
+  /* 底色与拉丝金属纹理由 page 层主题（app.mpx）提供 */
 }
 
 /* ==================== 动画定义 ==================== */
@@ -850,16 +821,22 @@ createPage({
   animation-fill-mode: forwards;
 }
 
-/* ==================== Hero 头部 ==================== */
+/* ==================== Hero：金属铭牌面板（riveted 四角铆钉） ==================== */
 .hero-section {
   position: relative;
   overflow: hidden;
-  background: var(--bg-hero);
-  padding: 48rpx 32rpx 56rpx;
-  margin: 0 0 32rpx 0;
-  border-radius: 0 0 48rpx 48rpx;
+  margin: 24rpx 24rpx 0;
+  padding: 40rpx 32rpx 44rpx;
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-float);
 }
 
+/* 铭牌暗纹：拉丝金属同心圈 */
 .hero-deco {
   position: absolute;
   border-radius: 50%;
@@ -871,7 +848,7 @@ createPage({
   height: 320rpx;
   top: -140rpx;
   right: -80rpx;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-fill);
 }
 
 .deco-2 {
@@ -879,12 +856,12 @@ createPage({
   height: 180rpx;
   bottom: -60rpx;
   left: -40rpx;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-fill);
 }
 
 .hero-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .device-header {
@@ -899,39 +876,55 @@ createPage({
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 10rpx;
+}
+
+.device-name-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+}
+
+/* 在线状态 LED（全局 .led.on：绿色点亮） */
+.device-led {
+  width: 16rpx;
+  height: 16rpx;
 }
 
 .device-name {
-  font-size: 40rpx;
+  font-size: 38rpx;
   font-weight: 700;
-  color: #FFFFFF;
-  letter-spacing: 1rpx;
+  color: var(--color-text);
+  letter-spacing: 2rpx;
   word-break: break-all;
 }
 
+/* 设备编号：大号 DIN 数码铭牌（模板挂全局 .mono 字体类） */
 .device-sn {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'SF Mono', Menlo, monospace;
-  letter-spacing: 0.5rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 2rpx;
+  word-break: break-all;
 }
 
 .device-meta {
-  margin-top: 8rpx;
+  margin-top: 4rpx;
 }
 
+/* 平台铭牌小卡 */
 .platform-badge {
   display: inline-flex;
   align-items: center;
   padding: 6rpx 20rpx;
-  border-radius: 999rpx;
+  border-radius: var(--radius-sm);
   font-size: 22rpx;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.18);
-  color: #FFFFFF;
-  border: 1rpx solid rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10rpx);
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+  border: 1rpx solid var(--color-border);
 }
 
 .header-actions {
@@ -941,31 +934,38 @@ createPage({
   gap: 16rpx;
 }
 
+/* 主题 / 历史：圆形金属旋钮 */
 .theme-switch,
 .history-btn {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1rpx solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
+  background: var(--grad-btn-outline);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .theme-switch:active {
   transform: scale(0.9) rotate(-15deg);
+  filter: brightness(0.95);
 }
 
 .history-btn:active {
   transform: scale(0.9);
+  filter: brightness(0.95);
 }
 
 .theme-icon,
 .history-icon {
   font-size: 32rpx;
-  color: #FFFFFF;
+  line-height: 1;
+  color: var(--color-text-secondary);
 }
 
 /* ==================== 内容包装器 ==================== */
@@ -982,11 +982,12 @@ createPage({
   padding: 120rpx 40rpx;
 }
 
+/* 加载环：钢灰轨道 + 工业橙指针 */
 .loading-spinner {
   width: 60rpx;
   height: 60rpx;
-  border: 6rpx solid var(--bg-primary);
-  border-top-color: var(--accent-primary);
+  border: 6rpx solid var(--color-track);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: rotate 0.8s linear infinite;
   margin-bottom: 24rpx;
@@ -994,7 +995,8 @@ createPage({
 
 .loading-text {
   font-size: 28rpx;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
+  letter-spacing: 2rpx;
 }
 
 .empty-icon {
@@ -1004,6 +1006,7 @@ createPage({
   margin-bottom: 32rpx;
 }
 
+/* 未点亮 LED */
 .empty-dot {
   position: absolute;
   left: 50%;
@@ -1012,16 +1015,18 @@ createPage({
   height: 24rpx;
   margin: -12rpx 0 0 -12rpx;
   border-radius: 50%;
-  background: var(--text-tertiary);
+  background: var(--color-track);
+  box-shadow: inset 0 0 4rpx rgba(0, 0, 0, 0.35);
 }
 
+/* 钢灰雷达圈 */
 .empty-wave {
   position: absolute;
   left: 50%;
   top: 50%;
   border-radius: 50%;
-  border: 3rpx solid var(--text-tertiary);
-  opacity: 0.3;
+  border: 3rpx solid var(--color-border-strong);
+  opacity: 0.35;
 }
 
 .wave-1 {
@@ -1039,14 +1044,15 @@ createPage({
 
 .empty-title {
   font-size: 32rpx;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 2rpx;
   margin-bottom: 12rpx;
 }
 
 .empty-hint {
   font-size: 26rpx;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
   text-align: center;
   line-height: 1.5;
 }
@@ -1056,49 +1062,81 @@ createPage({
   padding-bottom: 24rpx;
 }
 
+/* 章节标题：螺丝点 + 中文标题 + 英文铭牌小标 */
 .section-header {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 24rpx;
-  padding-left: 4rpx;
+  gap: 14rpx;
+  margin: 32rpx 8rpx 20rpx;
 }
 
-.header-accent {
-  width: 6rpx;
-  height: 28rpx;
-  border-radius: 4rpx;
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-primary));
+.header-screw {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, var(--deco-rivet) 0 3rpx, var(--deco-rivet-shadow) 3.6rpx 5rpx, var(--color-border-strong) 5.6rpx 8rpx);
+  box-shadow: inset 0 0 2rpx rgba(0, 0, 0, 0.3), 0 1rpx 2rpx rgba(0, 0, 0, 0.2);
 }
 
 .section-title {
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: 0.5rpx;
+  color: var(--color-text);
+  letter-spacing: 3rpx;
 }
 
-/* ==================== 命令卡片（参考蓝牙控制页 pf-field 风格） ==================== */
+/* 英文铭牌小标（模板挂全局 .mono） */
+.header-plate {
+  margin-left: 4rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+}
+
+/* ==================== 命令卡片：铆钉金属卡 + 左侧 LED 竖条 ==================== */
 .command-card {
-  background: var(--bg-secondary);
+  position: relative;
+  background: var(--grad-panel);
+  border: 2rpx var(--panel-border-style) var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  padding: 28rpx;
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.12),
+    var(--shadow-card);
+  padding: 30rpx 28rpx 28rpx;
   margin-bottom: 28rpx;
   overflow: hidden;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, filter 0.2s ease, border-color 0.2s ease;
 }
 
+/* 按压态：橙色描边反馈 */
 .command-card:active {
   transform: scale(0.995);
+  filter: brightness(0.98);
+  border-color: var(--color-primary);
+}
+
+/* 左侧 LED 竖条：橙色指令通道指示 */
+.cmd-led {
+  position: absolute;
+  left: 0;
+  top: 28rpx;
+  bottom: 28rpx;
+  width: 6rpx;
+  border-radius: 0 3rpx 3rpx 0;
+  background: var(--color-primary);
+  box-shadow: 0 0 10rpx var(--color-primary);
+  z-index: 2;
 }
 
 .command-title {
   display: block;
-  font-size: 22rpx;
+  font-size: 32rpx;
   font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
+  color: var(--color-text);
   letter-spacing: 2rpx;
   margin-bottom: 8rpx;
 }
@@ -1106,17 +1144,17 @@ createPage({
 .command-desc {
   display: block;
   font-size: 24rpx;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   line-height: 1.5;
   margin-bottom: 24rpx;
 }
 
-/* ==================== 参数输入（标签在左，输入框在右） ==================== */
+/* ==================== 参数输入：内凹金属槽（标签在左，输入在右） ==================== */
 .param-row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 16rpx;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
 }
 
 .param-row:last-child {
@@ -1126,9 +1164,10 @@ createPage({
 .param-label {
   font-size: 26rpx;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--color-text-secondary);
+  letter-spacing: 1rpx;
   flex-shrink: 0;
-  width: 140rpx;
+  width: 150rpx;
 }
 
 .param-input-wrap {
@@ -1136,92 +1175,118 @@ createPage({
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
 }
 
+/* 内凹金属槽：聚焦橙色描边（模板挂全局 .mono） */
 .param-input {
   flex: 1;
   min-width: 0;
   height: 80rpx;
-  padding: 0 16rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
-  border: none;
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius-sm);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
   font-size: 28rpx;
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
+  color: var(--color-text);
   text-align: left;
+}
+
+.param-input:focus {
+  border-color: var(--color-primary);
 }
 
 .param-unit {
   font-size: 24rpx;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
   min-width: 40rpx;
   text-align: center;
 }
 
+/* picker 宿主不画槽，槽画在内层 display 上 */
 .param-picker {
   width: 100%;
   height: 80rpx;
   padding: 0;
   box-sizing: border-box;
   display: block;
+  background: transparent;
+  border: none;
   border-radius: var(--radius-sm);
+  box-shadow: none;
 }
 
 .picker-display {
   width: 100%;
   height: 80rpx;
-  padding: 0 16rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-tertiary);
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius-sm);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
 }
 
 .picker-value {
   font-size: 28rpx;
-  color: var(--text-primary);
+  color: var(--color-text);
+  letter-spacing: 1rpx;
 }
 
 .picker-arrow {
   font-size: 32rpx;
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
+/* 枚举说明：钢灰次级信息标记（--color-accent-2） */
 .param-hint {
   margin-top: 4rpx;
   margin-bottom: 16rpx;
+  padding-left: 16rpx;
+  border-left: 4rpx solid var(--color-accent-2);
 }
 
 .param-hint-text {
   font-size: 22rpx;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
-/* ==================== 执行按钮（参考蓝牙「设定」按钮） ==================== */
-.card-actions {
+/* ==================== 执行按钮：橙色金属实体键 ==================== */
+.command-actions {
   display: flex;
-  margin-top: 20rpx;
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx var(--panel-border-style) var(--color-border);
 }
 
 .btn-set {
   margin-left: auto;
-  height: 60rpx;
-  padding: 0 24rpx;
+  height: 72rpx;
+  padding: 0 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  border: none;
-  background: var(--accent-success);
+  border: 2rpx var(--panel-border-style) var(--color-border-strong);
+  background: var(--grad-btn-primary);
   color: #FFFFFF;
-  font-size: 24rpx;
-  font-weight: 600;
+  font-size: 26rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.35),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.2),
+    0 6rpx 16rpx rgba(232, 115, 10, 0.35);
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
 
 .btn-set::after {
@@ -1229,24 +1294,32 @@ createPage({
 }
 
 .btn-set:active {
-  opacity: 0.75;
-  transform: scale(0.96);
+  transform: scale(0.96) translateY(2rpx);
+  filter: brightness(0.94);
 }
 
-/* ==================== 分时压力 ==================== */
+/* ==================== 分时压力：金属拨杆 + 时段子面板 ==================== */
+/* 总开关行：凸起金属条 + 状态 LED（原生 switch 拨杆工业化见非 scoped 区） */
 .tp-main-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 14rpx;
   margin-bottom: 24rpx;
-  padding-bottom: 20rpx;
-  border-bottom: 1rpx solid var(--bg-tertiary);
+  padding: 20rpx 24rpx;
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.1);
 }
 
 .tp-main-label {
+  flex: 1;
   font-size: 28rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 2rpx;
 }
 
 .tp-main-switch {
@@ -1259,9 +1332,12 @@ createPage({
   gap: 16rpx;
 }
 
+/* 时段模块：内凹安装槽 */
 .tp-slot {
-  background: var(--bg-tertiary);
+  background: var(--color-panel-2);
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius-sm);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
   padding: 20rpx;
   transition: opacity 0.2s ease;
 }
@@ -1273,14 +1349,16 @@ createPage({
 .tp-slot-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12rpx;
   margin-bottom: 16rpx;
 }
 
 .tp-slot-title {
+  flex: 1;
   font-size: 26rpx;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 1rpx;
 }
 
 .tp-slot-switch {
@@ -1297,19 +1375,24 @@ createPage({
   flex-shrink: 0;
 }
 
+/* 时间读数：DIN 数码管（模板挂全局 .mono） */
 .tp-time-val {
-  width: 140rpx;
-  height: 72rpx;
+  width: 150rpx;
+  height: 76rpx;
   line-height: 72rpx;
   text-align: center;
-  background: var(--bg-secondary);
+  background: var(--color-panel-3);
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 28rpx;
-  color: var(--text-primary);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 2rpx;
 }
 
 .tp-time-val.tp-off {
-  color: var(--text-tertiary);
+  color: var(--color-text-tertiary);
 }
 
 .tp-pressure-wrap {
@@ -1317,100 +1400,89 @@ createPage({
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
 }
 
+/* 压力输入：内凹数码槽（模板挂全局 .mono） */
 .tp-pressure-input {
   flex: 1;
   min-width: 0;
-  height: 72rpx;
-  padding: 0 16rpx;
+  height: 76rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
-  border: none;
+  background: var(--color-panel-3);
+  border: 2rpx solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: 28rpx;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  box-shadow: inset 2rpx 2rpx 4rpx var(--color-input-inset);
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-text);
   text-align: left;
+}
+
+.tp-pressure-input:focus {
+  border-color: var(--color-primary);
 }
 
 .tp-pressure-unit {
   font-size: 22rpx;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
-/* ==================== 安全提示 ==================== */
+/* ==================== 安全提示：琥珀警戒条 ==================== */
 .safety-banner {
   display: flex;
   align-items: center;
   gap: 16rpx;
   padding: 24rpx 28rpx;
   margin-top: 8rpx;
-  background: rgba(255, 149, 0, 0.08);
-  border: 1rpx solid rgba(255, 149, 0, 0.2);
-  border-radius: var(--radius-md);
+  background: rgba(214, 131, 10, 0.08);
+  border: 2rpx var(--panel-border-style) rgba(214, 131, 10, 0.45);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 2rpx 2rpx 0 var(--color-highlight),
+    var(--shadow-card);
 }
 
+/* 警示图标：黄黑斜纹铭牌 */
 .safety-icon {
-  width: 36rpx;
-  height: 36rpx;
+  width: 44rpx;
+  height: 44rpx;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--accent-warning);
+  border-radius: var(--radius-sm);
+  border: 2rpx solid rgba(0, 0, 0, 0.25);
+  background: repeating-linear-gradient(-45deg, var(--color-warning) 0 12rpx, rgba(0, 0, 0, 0.55) 12rpx 24rpx);
   color: #FFFFFF;
-  font-size: 24rpx;
+  font-size: 26rpx;
   font-weight: 700;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.4);
 }
 
 .safety-text {
   flex: 1;
   font-size: 24rpx;
-  color: var(--accent-warning);
+  color: var(--color-warning);
   line-height: 1.5;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 1rpx;
 }
 
-/* ==================== 深色模式覆盖 ==================== */
-.control-container.dark .command-card {
-  border: 1rpx solid rgba(255, 255, 255, 0.06);
-}
-
-.control-container.dark .command-title {
-  color: var(--accent-success);
-}
-
-.control-container.dark .param-input {
-  background: #2C2C2E;
-  color: var(--text-primary);
-}
-
-.control-container.dark .picker-display {
-  background: #2C2C2E;
-}
-
+/* ==================== 暗档补丁：提亮橙色光效（面板/边框/文字由变量自动切换） ==================== */
 .control-container.dark .btn-set {
-  background: transparent;
-  border: 1rpx solid var(--accent-success);
-  color: var(--accent-success);
-}
-
-.control-container.dark .tp-slot {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.control-container.dark .tp-time-val,
-.control-container.dark .tp-pressure-input {
-  background: #2C2C2E;
-  color: var(--text-primary);
+  box-shadow:
+    inset 2rpx 2rpx 0 rgba(255, 255, 255, 0.3),
+    inset -2rpx -2rpx 0 rgba(0, 0, 0, 0.25),
+    0 6rpx 16rpx rgba(255, 138, 30, 0.35);
 }
 
 .control-container.dark .safety-banner {
-  background: rgba(255, 159, 10, 0.1);
-  border-color: rgba(255, 159, 10, 0.25);
+  background: rgba(255, 176, 32, 0.08);
+  border-color: rgba(255, 176, 32, 0.4);
 }
 </style>
 
@@ -1420,12 +1492,34 @@ createPage({
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* 分时压力开关：金属拨杆工业化。
+   原生 switch 内部节点（.wx-switch-input）拿不到 scoped 属性，须在非 scoped 区覆盖：
+   关闭 = 钢灰拨杆槽；开启 = 工业橙 LED 拨杆。 */
+.tp-main-switch .wx-switch-input,
+.tp-slot-switch .wx-switch-input {
+  background: var(--color-track) !important;
+  border: 2rpx solid var(--color-border) !important;
+  box-shadow: inset 0 2rpx 4rpx var(--color-input-inset) !important;
+}
+
+.tp-main-switch .wx-switch-input.checked,
+.tp-slot-switch .wx-switch-input.checked {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 12rpx rgba(232, 115, 10, 0.5) !important;
+}
+
+.control-container.dark .tp-main-switch .wx-switch-input.checked,
+.control-container.dark .tp-slot-switch .wx-switch-input.checked {
+  box-shadow: 0 0 14rpx rgba(255, 138, 30, 0.55) !important;
+}
 </style>
 
 <script type="application/json">
 {
   "navigationBarTitleText": "远程控制",
-  "navigationBarBackgroundColor": "#007AFF",
-  "navigationBarTextStyle": "white"
+  "navigationBarBackgroundColor": "#D7DBE1",
+  "navigationBarTextStyle": "black"
 }
 </script>
